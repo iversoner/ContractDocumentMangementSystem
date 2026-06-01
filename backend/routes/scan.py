@@ -1,0 +1,165 @@
+"""
+目录扫描 & 批量导入 API
+扫描指定目录下的文件，识别哪些文件尚未录入系统，支持一键批量导入
+"""
+import os
+import re
+from datetime import date
+
+from flask import Blueprint, request, jsonify, g
+
+from database.db import get_db
+from services.log_service import write_log
+from middleware.auth_middleware import login_required
+
+scan_bp = Blueprint('scan', __name__)
+
+# 支持的文件扩展名
+FILE_EXTS = {'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.txt', '.zip', '.rar'}
+
+# 按模块已有的 file_path 查询
+TABLE_MAP = {
+    'contract': 'contracts',
+    'patent': 'patents',
+    'insurance': 'insurances',
+}
+
+
+def _scan_dir(root_dir: str, ext_filter: set = None) -> list:
+    """递归扫描目录，返回文件名列表"""
+    if ext_filter is None:
+        ext_filter = FILE_EXTS
+    results = []
+    if not os.path.isdir(root_dir):
+        return results
+    for dirpath, _, filenames in os.walk(root_dir):
+        for fname in filenames:
+            ext = os.path.splitext(fname)[1].lower()
+            if ext in ext_filter:
+                full_path = os.path.normpath(os.path.join(dirpath, fname))
+                results.append({
+                    'name': fname,
+                    'path': full_path,
+                    'size': os.path.getsize(full_path),
+                })
+    return results
+
+
+@scan_bp.route('/api/scan', methods=['POST'])
+@login_required
+def scan_directory():
+    """扫描指定目录，返回文件列表及是否已在系统中"""
+    data = request.get_json() or {}
+    directory = data.get('directory', '').strip()
+    module = data.get('module', 'contract').strip()  # contract / patent / insurance
+
+    if not directory:
+        return jsonify({'success': False, 'message': '请提供扫描目录路径'}), 400
+    if module not in TABLE_MAP:
+        return jsonify({'success': False, 'message': '模块类型无效'}), 400
+
+    if not os.path.isdir(directory):
+        return jsonify({'success': False, 'message': f'目录不存在: {directory}'}), 400
+
+    # 扫描目录
+    files = _scan_dir(directory)
+
+    # 查询已录入的文件路径
+    table = TABLE_MAP[module]
+    db = get_db()
+    existing_rows = db.execute(f"SELECT file_path FROM {table} WHERE file_path != ''").fetchall()
+    existing_paths = set()
+    for r in existing_rows:
+        existing_paths.add(os.path.normpath(r['file_path']))
+
+    # 区分已录入和未录入
+    new_files = []
+    existing_files = []
+    for f in files:
+        if f['path'] in existing_paths:
+            existing_files.append(f)
+        else:
+            new_files.append(f)
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'directory': directory,
+            'module': module,
+            'total': len(files),
+            'newCount': len(new_files),
+            'existingCount': len(existing_files),
+            'newFiles': new_files,
+            'existingFiles': existing_files,
+        }
+    })
+
+
+@scan_bp.route('/api/scan/import', methods=['POST'])
+@login_required
+def bulk_import():
+    """批量导入扫描到的文件"""
+    data = request.get_json() or {}
+    module = data.get('module', 'contract').strip()
+    files = data.get('files', [])  # [{path: ..., name: ...}]
+    category = data.get('category', '')  # 合同/专利/车险续期
+
+    if module not in TABLE_MAP:
+        return jsonify({'success': False, 'message': '模块类型无效'}), 400
+    if not files:
+        return jsonify({'success': False, 'message': '请提供要导入的文件列表'}), 400
+
+    table = TABLE_MAP[module]
+    db = get_db()
+    today = date.today().isoformat()
+    imported = 0
+    skipped = 0
+
+    for f in files:
+        file_path = f.get('path', '')
+        file_name = f.get('name', '')
+        if not file_path:
+            skipped += 1
+            continue
+
+        # 检查是否已存在
+        existing = db.execute(
+            f"SELECT id FROM {table} WHERE file_path = ?", (file_path,)
+        ).fetchone()
+        if existing:
+            skipped += 1
+            continue
+
+        # 从文件名提取名称（去掉扩展名）
+        name_no_ext = os.path.splitext(file_name)[0]
+
+        if module == 'contract':
+            db.execute(
+                f"INSERT INTO {table} (name, category, company, agent, start_date, end_date, file_path, source, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, 'scan', 'active')",
+                (name_no_ext, category or '未分类', '', '', today, today, file_path)
+            )
+        elif module == 'patent':
+            db.execute(
+                f"INSERT INTO {table} (name, patent_no, type, holder, agent, application_date, expire_date, file_path, source, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scan', 'active')",
+                (name_no_ext, 'AUTO-' + name_no_ext[:20], '', '', '', today, today, file_path)
+            )
+        elif module == 'insurance':
+            db.execute(
+                f"INSERT INTO {table} (plate_no, brand, insurance_company, insurance_type, agent, start_date, end_date, file_path, source, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scan', 'active')",
+                (name_no_ext, name_no_ext, '', '', '', today, today, file_path)
+            )
+        imported += 1
+
+    db.commit()
+    write_log(action='批量导入', module=f'{module}管理',
+              detail=f'扫描导入 {imported} 条记录（跳过 {skipped} 条已存在）',
+              user_id=g.user_id, username=g.username)
+
+    return jsonify({
+        'success': True,
+        'message': f'成功导入 {imported} 条记录（跳过 {skipped} 条已存在）',
+        'data': {'imported': imported, 'skipped': skipped}
+    })

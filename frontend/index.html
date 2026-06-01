@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>素珍管理系统</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="login-page">
+
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>🌐 素珍管理系统</h1>
+      <p>公司综合管理平台</p>
+    </div>
+
+    <form onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label for="username">用户名</label>
+        <input type="text" id="username" class="form-control" placeholder="请输入用户名" autocomplete="username">
+      </div>
+
+      <div class="form-group">
+        <label for="password">密码</label>
+        <input type="password" id="password" class="form-control" placeholder="请输入密码" autocomplete="current-password">
+      </div>
+
+      <div id="loginError" class="alert alert-danger" style="display: none;"></div>
+
+      <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 10px 0; font-size: 15px;">
+        登 录
+      </button>
+    </form>
+
+    <p style="text-align: center; margin-top: 20px; font-size: 12px; color: var(--text-muted);">
+      初始管理员：admin / admin!
+    </p>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

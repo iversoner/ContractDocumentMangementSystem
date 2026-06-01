@@ -1,0 +1,47 @@
+# ============================================================
+#  素珍管理系统 - Docker Compose 配置
+#  全栈部署：前端 nginx + 后端 Flask + 数据持久化
+#
+#  数据目录和端口通过 .env 文件配置（由 setup.bat 生成）
+# ============================================================
+
+version: "3.9"
+
+services:
+  # ---- 后端 Flask 服务 ----
+  backend:
+    build:
+      context: ..               # 构建上下文为项目根目录
+      dockerfile: docker/Dockerfile.backend
+    image: suzhen-backend:latest
+    container_name: suzhen-backend
+    volumes:
+      - ${DATA_DIR:-./data}:/data       # 用户选择的数据存储目录
+    restart: unless-stopped
+    networks:
+      - suzhen-net
+    environment:
+      - FLASK_DEBUG=false
+      - DATABASE_PATH=/data/suzhen.db
+      - STORAGE_UPLOAD_FOLDER=/data/uploads
+
+  # ---- 前端 nginx 服务 ----
+  frontend:
+    build:
+      context: ..               # 构建上下文为项目根目录
+      dockerfile: docker/Dockerfile
+    image: suzhen-frontend:latest
+    container_name: suzhen-frontend
+    ports:
+      - "${APP_PORT:-8080}:80"               # 用户可配置端口
+    restart: unless-stopped
+    networks:
+      - suzhen-net
+    depends_on:
+      - backend
+
+# ---- 自定义网络 ----
+networks:
+  suzhen-net:
+    driver: bridge
+    name: suzhen-net

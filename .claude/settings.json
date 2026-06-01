@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/python.exe scripts/test_settings.py)",
+      "Bash(.venv/Scripts/python.exe scripts/_test_settings.py)",
+      "Bash(.venv/Scripts/python.exe -c ':*)",
+      "Bash(where python:*)",
+      "Bash(python -c \"import sys; print\\(sys.executable\\); print\\(sys.path\\)\")",
+      "Bash(\"E:/Tools/python/Python-3.11/python.exe\" -c \"import flask; print\\('flask OK'\\)\")",
+      "Bash(E:/Tools/python/Python-3.11/python.exe -c ':*)",
+      "Bash(\".venv/Scripts/python.exe\" test_smtp.py)",
+      "Bash(curl -s http://localhost:5000/api/auth/me)",
+      "Bash(.venv/Scripts/python.exe test_full.py)",
+      "Bash(.venv/Scripts/pip.exe install:*)",
+      "Bash(.venv/Scripts/python.exe debug_api.py)",
+      "Bash(cmd.exe /c build.bat)",
+      "Bash(cmd.exe /c \"build.bat\")",
+      "Bash(cmd.exe /c \"call build.bat\")",
+      "Bash(cmd.exe /c \"e:\\\\GitProject\\\\Private\\\\suzhenManagementSystem\\\\build.bat\")",
+      "Bash(docker compose:*)",
+      "Bash(where docker:*)",
+      "Bash(docker --version)"
+    ]
+  }
+}

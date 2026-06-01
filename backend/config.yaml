@@ -1,0 +1,42 @@
+# ============================================================
+#  素珍管理系统 - 配置文件
+# ============================================================
+
+app:
+  name: 素珍管理系统
+  secret_key: suzhen-secret-key-change-in-production
+  debug: true
+
+server:
+  host: 0.0.0.0
+  port: 5000
+
+database:
+  path: backend/database/suzhen.db
+
+# 默认管理员（首次启动时自动创建）
+admin:
+  username: admin
+  password: admin!
+  display_name: 管理员
+  email: admin@suzhen.com
+
+# 邮箱服务配置
+email:
+  smtp_server: smtp.example.com
+  smtp_port: 587
+  username: notify@suzhen.com
+  password: ""
+  use_tls: true
+  sender_name: 素珍管理系统
+
+# 文件存储
+storage:
+  upload_folder: backend/uploads
+  max_file_size: 10485760  # 10 MB
+
+# 到期提醒
+reminder:
+  enabled: false
+  days_before: 30
+  send_time: "09:00"

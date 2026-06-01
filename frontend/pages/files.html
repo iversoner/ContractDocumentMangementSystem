@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文件管理 - 素珍管理系统</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="logo" style="display: flex; align-items: center; gap: 10px;">
+      <button class="menu-toggle" id="menuToggle" title="菜单">&#9776;</button>
+      <span>🌐 素珍管理系统</span>
+    </div>
+    <div class="nav-links">
+      <a href="dashboard.html">仪表盘</a>
+      <a href="contract.html">合同管理</a>
+      <a href="patent.html">专利管理</a>
+      <a href="insurance.html">车险续期</a>
+      <a href="files.html" class="active">文件管理</a>
+      <a href="users.html" class="admin-only">用户管理</a>
+      <a href="settings.html" class="admin-only">系统配置</a>
+      <a href="logs.html">系统日志</a>
+      <a href="export.html">数据导出</a>
+    </div>
+    <div class="nav-user">
+      <span style="font-size:13px;" id="navUserName">管理员</span>
+      <span class="avatar" id="navUserAvatar">管</span>
+      <a href="javascript:handleLogout()" class="btn btn-outline btn-sm">退出</a>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="menu-group">
+      <div class="menu-group-title">主菜单</div>
+      <a href="dashboard.html" class="menu-item"><span class="icon">📊</span> 仪表盘</a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">业务管理</div>
+      <a href="contract.html" class="menu-item"><span class="icon">📋</span> 合同管理</a>
+      <a href="patent.html" class="menu-item"><span class="icon">💡</span> 专利管理</a>
+      <a href="insurance.html" class="menu-item"><span class="icon">🚗</span> 车险续期</a>
+      <a href="files.html" class="menu-item active"><span class="icon">📁</span> 文件管理</a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">系统管理</div>
+      <a href="users.html" class="menu-item admin-only"><span class="icon">👥</span> 用户管理</a>
+      <a href="settings.html" class="menu-item admin-only"><span class="icon">⚙️</span> 系统配置</a>
+      <a href="logs.html" class="menu-item"><span class="icon">📜</span> 系统日志</a>
+      <a href="export.html" class="menu-item"><span class="icon">📤</span> 数据导出</a>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>📁 文件管理</h1>
+      <div class="breadcrumb">首页 / 文件管理</div>
+    </div>
+
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+        <div class="search-bar" style="margin-bottom: 0;">
+          <select class="form-control" id="filterFileCategory">
+            <option value="">全部类别</option>
+            <option value="合同">合同</option>
+            <option value="专利">专利</option>
+            <option value="车险续期">车险续期</option>
+          </select>
+          <input type="text" class="form-control" id="fileSearch" placeholder="搜索文件名..." onkeydown="if(event.key==='Enter')renderFiles()">
+          <button class="btn btn-primary btn-sm" onclick="renderFiles()">🔍 搜索</button>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('fileUploadInput').click()">📤 上传文件</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadSelected()">📥 下载选中</button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>文件名</th>
+              <th>类别</th>
+              <th>大小</th>
+              <th>上传时间</th>
+              <th>上传者</th>
+              <th>本地路径</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="fileTableBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="filePagination"></div>
+
+      <div style="margin-top: 16px; padding: 12px; background: #fafafa; border-radius: var(--radius-sm); font-size: 12px; color: var(--text-muted);">
+        💡 文件类别固定可选：<strong>合同</strong>、<strong>专利</strong>、<strong>车险续期</strong>。文件存储在本地文件夹中，支持增删改查、上传下载功能。
+      </div>
+    </div>
+  </main>
+
+  <script src="../js/app.js"></script>
+  <script>
+    let filePage = 1;
+    const filePageSize = 10;
+
+    async function loadFiles() {
+      const params = { page: filePage, pageSize: filePageSize };
+      if (document.getElementById('filterFileCategory').value) params.category = document.getElementById('filterFileCategory').value;
+      if (document.getElementById('fileSearch').value) params.keyword = document.getElementById('fileSearch').value;
+      try { const res = await API.get('/files', params); return res.data; }
+      catch (err) { showToast('加载失败: ' + err.message, 'error'); return { items: [], total: 0 }; }
+    }
+
+    function renderFiles() { filePage = 1; renderFileTable(); }
+
+    async function renderFileTable() {
+      const data = await loadFiles();
+      const tbody = document.getElementById('fileTableBody');
+
+      if (data.items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:40px; color:var(--text-muted);">暂无文件</td></tr>`;
+      } else {
+        tbody.innerHTML = data.items.map(f => `
+          <tr>
+            <td>${f.id}</td>
+            <td>📄 ${f.name}</td>
+            <td><span class="badge active">${f.category}</span></td>
+            <td>${formatFileSize(f.size)}</td>
+            <td>${f.createdAt || f.uploadTime}</td>
+            <td>${f.uploader}</td>
+            <td><code style="font-size:11px; background:#f0f0f0; padding:2px 6px; border-radius:3px;">${f.storedPath || f.path}</code></td>
+            <td>
+              <div class="btn-group">
+                <button class="btn btn-outline btn-sm" onclick="showToast('正在下载 ${f.name} (模拟)', 'info')">⬇ 下载</button>
+                <button class="btn btn-outline btn-sm" onclick="showToast('文件链接: ${f.storedPath || f.path}', 'info')">🔗 链接</button>
+                <button class="btn btn-danger btn-sm admin-only" onclick="deleteFile(${f.id}, '${f.name.replace(/'/g, "\\'")}')">🗑 删除</button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      const totalPages = Math.ceil(data.total / filePageSize);
+      const pag = document.getElementById('filePagination');
+      if (totalPages <= 1) { pag.innerHTML = ''; return; }
+      let html = `<button class="page-btn" onclick="goFilePage(${filePage - 1})" ${filePage === 1 ? 'disabled' : ''}>&laquo;</button>`;
+      for (let i = 1; i <= totalPages; i++) {
+        html += `<button class="page-btn ${i === filePage ? 'active' : ''}" onclick="goFilePage(${i})">${i}</button>`;
+      }
+      html += `<button class="page-btn" onclick="goFilePage(${filePage + 1})" ${filePage === totalPages ? 'disabled' : ''}>&raquo;</button>`;
+      pag.innerHTML = html;
+    }
+
+    function goFilePage(p) { filePage = p; renderFileTable(); }
+
+    async function deleteFile(id, name) {
+      if (!confirm('确定删除文件「' + name + '」吗？')) return;
+      try { await API.del('/files/' + id); showToast('文件已删除', 'success'); renderFileTable(); }
+      catch (err) { showToast('删除失败: ' + err.message, 'error'); }
+    }
+    function downloadSelected() {
+      const selected = prompt('请输入要下载的文件ID:');
+      if (selected) { API.download('/files/' + selected + '/download', ''); }
+    }
+
+    
+    async function handleFileUpload(input) {
+      if (!input.files.length) return;
+      const cat = prompt('选择文件类别: 合同/专利/车险续期', '合同');
+      if (!['合同','专利','车险续期'].includes(cat)) { showToast('无效类别', 'error'); return; }
+      for (const file of input.files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('category', cat);
+        try {
+          await API.upload('/files/upload', fd);
+          showToast(file.name + ' 上传成功', 'success');
+        } catch (err) { showToast(file.name + ' 上传失败: ' + err.message, 'error'); }
+      }
+      renderFileTable();
+      input.value = '';
+    }
+
+    document.addEventListener('DOMContentLoaded', renderFileTable);
+  </script>
+</body>
+</html>

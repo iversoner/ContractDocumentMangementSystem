@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统日志 - 素珍管理系统</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="logo" style="display: flex; align-items: center; gap: 10px;">
+      <button class="menu-toggle" id="menuToggle" title="菜单">&#9776;</button>
+      <span>🌐 素珍管理系统</span>
+    </div>
+    <div class="nav-links">
+      <a href="dashboard.html">仪表盘</a>
+      <a href="contract.html">合同管理</a>
+      <a href="patent.html">专利管理</a>
+      <a href="insurance.html">车险续期</a>
+      <a href="files.html">文件管理</a>
+      <a href="users.html" class="admin-only">用户管理</a>
+      <a href="settings.html" class="admin-only">系统配置</a>
+      <a href="logs.html" class="active">系统日志</a>
+      <a href="export.html">数据导出</a>
+    </div>
+    <div class="nav-user">
+      <span style="font-size:13px;" id="navUserName">管理员</span>
+      <span class="avatar" id="navUserAvatar">管</span>
+      <a href="javascript:handleLogout()" class="btn btn-outline btn-sm">退出</a>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="menu-group">
+      <div class="menu-group-title">主菜单</div>
+      <a href="dashboard.html" class="menu-item"><span class="icon">📊</span> 仪表盘</a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">业务管理</div>
+      <a href="contract.html" class="menu-item"><span class="icon">📋</span> 合同管理</a>
+      <a href="patent.html" class="menu-item"><span class="icon">💡</span> 专利管理</a>
+      <a href="insurance.html" class="menu-item"><span class="icon">🚗</span> 车险续期</a>
+      <a href="files.html" class="menu-item"><span class="icon">📁</span> 文件管理</a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">系统管理</div>
+      <a href="users.html" class="menu-item admin-only"><span class="icon">👥</span> 用户管理</a>
+      <a href="settings.html" class="menu-item admin-only"><span class="icon">⚙️</span> 系统配置</a>
+      <a href="logs.html" class="menu-item active"><span class="icon">📜</span> 系统日志</a>
+      <a href="export.html" class="menu-item"><span class="icon">📤</span> 数据导出</a>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>📜 系统日志</h1>
+      <div class="breadcrumb">首页 / 系统日志</div>
+    </div>
+
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+        <div class="search-bar" style="margin-bottom: 0;">
+          <select class="form-control" id="filterLogLevel">
+            <option value="">全部级别</option>
+            <option value="info">信息</option>
+            <option value="warning">警告</option>
+            <option value="error">错误</option>
+          </select>
+          <select class="form-control" id="filterLogModule">
+            <option value="">全部模块</option>
+            <option value="认证">认证</option>
+            <option value="合同管理">合同管理</option>
+            <option value="专利管理">专利管理</option>
+            <option value="车险续期">车险续期</option>
+            <option value="文件管理">文件管理</option>
+            <option value="系统配置">系统配置</option>
+            <option value="邮件服务">邮件服务</option>
+            <option value="数据导出">数据导出</option>
+          </select>
+          <input type="text" class="form-control" id="logSearch" placeholder="搜索日志内容..." onkeydown="if(event.key==='Enter')renderLogs()">
+          <button class="btn btn-primary btn-sm" onclick="renderLogs()">🔍 搜索</button>
+        </div>
+        <button class="btn btn-outline btn-sm admin-only" onclick="clearAllLogs()">🗑 清空日志</button>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>时间</th>
+              <th>用户</th>
+              <th>操作</th>
+              <th>模块</th>
+              <th>级别</th>
+              <th>详情</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="logPagination"></div>
+    </div>
+  </main>
+
+  <script src="../js/app.js"></script>
+  <script>
+    let logPage = 1;
+    const logPageSize = 10;
+
+    function getLogLevelBadge(level) {
+      const map = {
+        info: '<span class="badge active">信息</span>',
+        warning: '<span class="badge expiring">警告</span>',
+        error: '<span class="badge expired">错误</span>',
+      };
+      return map[level] || `<span class="badge">${level}</span>`;
+    }
+
+    async function loadLogs() {
+      const params = { page: logPage, pageSize: logPageSize };
+      if (document.getElementById('filterLogLevel').value) params.level = document.getElementById('filterLogLevel').value;
+      if (document.getElementById('filterLogModule').value) params.module = document.getElementById('filterLogModule').value;
+      if (document.getElementById('logSearch').value) params.keyword = document.getElementById('logSearch').value;
+      try { const res = await API.get('/logs', params); return res.data; }
+      catch (err) { showToast('加载失败: ' + err.message, 'error'); return { items: [], total: 0 }; }
+    }
+
+    function renderLogs() { logPage = 1; renderLogTable(); }
+
+    async function renderLogTable() {
+      const data = await loadLogs();
+      const tbody = document.getElementById('logTableBody');
+
+      if (data.items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted);">暂无日志记录</td></tr>`;
+      } else {
+        tbody.innerHTML = data.items.map(l => `
+          <tr>
+            <td>${l.id}</td>
+            <td style="white-space:nowrap;">${l.createdAt || l.time}</td>
+            <td>${l.username || l.user}</td>
+            <td>${l.action}</td>
+            <td>${l.module}</td>
+            <td>${getLogLevelBadge(l.level)}</td>
+            <td style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${l.detail}">${l.detail}</td>
+          </tr>
+        `).join('');
+      }
+
+      const totalPages = Math.ceil(data.total / logPageSize);
+      const pag = document.getElementById('logPagination');
+      if (totalPages <= 1) { pag.innerHTML = ''; return; }
+      let html = `<button class="page-btn" onclick="goLogPage(${logPage - 1})" ${logPage === 1 ? 'disabled' : ''}>&laquo;</button>`;
+      for (let i = 1; i <= totalPages; i++) {
+        html += `<button class="page-btn ${i === logPage ? 'active' : ''}" onclick="goLogPage(${i})">${i}</button>`;
+      }
+      html += `<button class="page-btn" onclick="goLogPage(${logPage + 1})" ${logPage === totalPages ? 'disabled' : ''}>&raquo;</button>`;
+      pag.innerHTML = html;
+    }
+
+    function goLogPage(p) { logPage = p; renderLogTable(); }
+
+    async function clearAllLogs() {
+      if (!confirm('确定清空所有日志吗？此操作不可恢复！')) return;
+      try { await API.del('/logs'); showToast('日志已清空', 'success'); renderLogTable(); }
+      catch (err) { showToast('清空失败: ' + err.message, 'error'); }
+    }
+
+    document.addEventListener('DOMContentLoaded', renderLogTable);
+  </script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据导出 - 素珍管理系统</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="logo" style="display: flex; align-items: center; gap: 10px;">
+      <button class="menu-toggle" id="menuToggle" title="菜单">&#9776;</button>
+      <span>🌐 素珍管理系统</span>
+    </div>
+    <div class="nav-links">
+      <a href="dashboard.html">仪表盘</a>
+      <a href="contract.html">合同管理</a>
+      <a href="patent.html">专利管理</a>
+      <a href="insurance.html">车险续期</a>
+      <a href="files.html">文件管理</a>
+      <a href="users.html" class="admin-only">用户管理</a>
+      <a href="settings.html" class="admin-only">系统配置</a>
+      <a href="logs.html">系统日志</a>
+      <a href="export.html" class="active">数据导出</a>
+    </div>
+    <div class="nav-user">
+      <span style="font-size:13px;" id="navUserName">管理员</span>
+      <span class="avatar" id="navUserAvatar">管</span>
+      <a href="javascript:handleLogout()" class="btn btn-outline btn-sm">退出</a>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="menu-group">
+      <div class="menu-group-title">主菜单</div>
+      <a href="dashboard.html" class="menu-item"><span class="icon">📊</span> 仪表盘</a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">业务管理</div>
+      <a href="contract.html" class="menu-item"><span class="icon">📋</span> 合同管理</a>
+      <a href="patent.html" class="menu-item"><span class="icon">💡</span> 专利管理</a>
+      <a href="insurance.html" class="menu-item"><span class="icon">🚗</span> 车险续期</a>
+      <a href="files.html" class="menu-item"><span class="icon">📁</span> 文件管理</a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">系统管理</div>
+      <a href="users.html" class="menu-item admin-only"><span class="icon">👥</span> 用户管理</a>
+      <a href="settings.html" class="menu-item admin-only"><span class="icon">⚙️</span> 系统配置</a>
+      <a href="logs.html" class="menu-item"><span class="icon">📜</span> 系统日志</a>
+      <a href="export.html" class="menu-item active"><span class="icon">📤</span> 数据导出</a>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>📤 数据导出</h1>
+      <div class="breadcrumb">首页 / 数据导出</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>选择导出方式</h3>
+      </div>
+
+      <div class="export-options">
+        <!-- 选项1：导出所有 -->
+        <label class="export-option" id="optionAll">
+          <input type="radio" name="exportType" value="all" onchange="toggleExportOption('all')">
+          <h4>📦 导出所有数据</h4>
+          <p>导出系统中所有的合同、专利、车险记录等全部数据</p>
+        </label>
+
+        <!-- 选项2：按创建时间 -->
+        <label class="export-option" id="optionByCreate">
+          <input type="radio" name="exportType" value="byCreate" onchange="toggleExportOption('byCreate')">
+          <h4>📅 导出指定创建时间范围的数据</h4>
+          <p>仅导出在指定时间段内创建的数据记录</p>
+          <div class="date-range" id="dateRangeCreate">
+            <div class="form-group">
+              <label>开始日期</label>
+              <input type="date" class="form-control" id="startCreate">
+            </div>
+            <div class="form-group">
+              <label>结束日期</label>
+              <input type="date" class="form-control" id="endCreate">
+            </div>
+          </div>
+        </label>
+
+        <!-- 选项3：按到期时间 -->
+        <label class="export-option" id="optionByExpire">
+          <input type="radio" name="exportType" value="byExpire" onchange="toggleExportOption('byExpire')">
+          <h4>⏰ 导出指定到期时间范围的数据</h4>
+          <p>仅导出在指定时间段内到期的数据记录，用于分析即将到期的合同和项目</p>
+          <div class="date-range" id="dateRangeExpire">
+            <div class="form-group">
+              <label>开始日期</label>
+              <input type="date" class="form-control" id="startExpire">
+            </div>
+            <div class="form-group">
+              <label>结束日期</label>
+              <input type="date" class="form-control" id="endExpire">
+            </div>
+          </div>
+        </label>
+      </div>
+
+      <div style="margin-top: 24px; padding: 16px; background: var(--primary-light); border-radius: var(--radius-md);">
+        <strong>💡 导出说明：</strong>
+        <ul style="margin-top: 8px; font-size: 13px; color: var(--text-secondary); line-height: 2;">
+          <li>导出格式为 Excel (.xlsx) 文件</li>
+          <li>导出的数据包含所有字段的完整信息</li>
+          <li>导出的文件名包含导出时间戳，便于归档管理</li>
+          <li>大数据量导出可能需要较长时间，请耐心等待</li>
+        </ul>
+      </div>
+
+      <div class="modal-footer" style="border-top: none; padding-top: 20px;">
+        <button class="btn btn-outline" onclick="window.location.href='dashboard.html'">取消</button>
+        <button class="btn btn-primary" onclick="doExport()" style="padding: 8px 32px;">📥 开始导出</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="../js/app.js"></script>
+  <script>
+    async function doExport() {
+      const selected = document.querySelector('input[name="exportType"]:checked');
+      if (!selected) { showToast('请选择导出方式', 'warning'); return; }
+      const type = selected.value;
+      const body = { type, format: 'json' };
+
+      if (type === 'byCreate') {
+        const s = document.getElementById('startCreate').value;
+        const e = document.getElementById('endCreate').value;
+        if (!s || !e) { showToast('请选择创建时间范围', 'warning'); return; }
+        body.startDate = s; body.endDate = e;
+      } else if (type === 'byExpire') {
+        const s = document.getElementById('startExpire').value;
+        const e = document.getElementById('endExpire').value;
+        if (!s || !e) { showToast('请选择到期时间范围', 'warning'); return; }
+        body.startDate = s; body.endDate = e;
+      }
+
+      try {
+        const res = await API.post('/export', body);
+        if (res.data) {
+          const info = res.data.exportInfo;
+          showToast('导出成功! 合同' + info.totalContracts + '条, 专利' + info.totalPatents + '条, 车险' + info.totalInsurances + '条', 'success');
+        }
+      } catch (err) { showToast('导出失败: ' + err.message, 'error'); }
+    }
+
+    function toggleExportOption(type) {
+      // 控制日期范围显示
+      document.getElementById('dateRangeCreate').classList.toggle('show', type === 'byCreate');
+      document.getElementById('dateRangeExpire').classList.toggle('show', type === 'byExpire');
+
+      // 高亮选中
+      document.querySelectorAll('.export-option').forEach(opt => opt.classList.remove('selected'));
+      const target = document.getElementById(type === 'all' ? 'optionAll' : type === 'byCreate' ? 'optionByCreate' : 'optionByExpire');
+      if (target) target.classList.add('selected');
+    }
+
+    // 初始化：默认选中"导出所有"
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelector('input[value="all"]').checked = true;
+      document.getElementById('optionAll').classList.add('selected');
+    });
+  </script>
+</body>
+</html>

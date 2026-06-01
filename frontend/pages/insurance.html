@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>车险续期 - 素珍管理系统</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="logo" style="display: flex; align-items: center; gap: 10px;">
+      <button class="menu-toggle" id="menuToggle" title="菜单">&#9776;</button>
+      <span>🌐 素珍管理系统</span>
+    </div>
+    <div class="nav-links">
+      <a href="dashboard.html">仪表盘</a>
+      <a href="contract.html">合同管理</a>
+      <a href="patent.html">专利管理</a>
+      <a href="insurance.html" class="active">车险续期</a>
+      <a href="files.html">文件管理</a>
+      <a href="users.html" class="admin-only">用户管理</a>
+      <a href="settings.html" class="admin-only">系统配置</a>
+      <a href="logs.html">系统日志</a>
+      <a href="export.html">数据导出</a>
+    </div>
+    <div class="nav-user">
+      <span style="font-size:13px;" id="navUserName">管理员</span>
+      <span class="avatar" id="navUserAvatar">管</span>
+      <a href="javascript:handleLogout()" class="btn btn-outline btn-sm">退出</a>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="menu-group">
+      <div class="menu-group-title">主菜单</div>
+      <a href="dashboard.html" class="menu-item"><span class="icon">📊</span> 仪表盘</a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">业务管理</div>
+      <a href="contract.html" class="menu-item"><span class="icon">📋</span> 合同管理</a>
+      <a href="patent.html" class="menu-item"><span class="icon">💡</span> 专利管理</a>
+      <a href="insurance.html" class="menu-item active"><span class="icon">🚗</span> 车险续期</a>
+      <a href="files.html" class="menu-item"><span class="icon">📁</span> 文件管理</a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">系统管理</div>
+      <a href="users.html" class="menu-item admin-only"><span class="icon">👥</span> 用户管理</a>
+      <a href="settings.html" class="menu-item admin-only"><span class="icon">⚙️</span> 系统配置</a>
+      <a href="logs.html" class="menu-item"><span class="icon">📜</span> 系统日志</a>
+      <a href="export.html" class="menu-item"><span class="icon">📤</span> 数据导出</a>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>🚗 车险续期管理</h1>
+      <div class="breadcrumb">首页 / 车险续期</div>
+    </div>
+
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-icon blue">🚗</div>
+        <div class="stat-info">
+          <div class="stat-value" id="totalCount">0</div>
+          <div class="stat-label">车险记录总数</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">✅</div>
+        <div class="stat-info">
+          <div class="stat-value" id="activeCount">0</div>
+          <div class="stat-label">生效中</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon orange">⏰</div>
+        <div class="stat-info">
+          <div class="stat-value" id="expiringCount" style="color: var(--warning);">0</div>
+          <div class="stat-label">即将到期</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon red">⚠️</div>
+        <div class="stat-info">
+          <div class="stat-value" id="expiredCount" style="color: var(--danger);">0</div>
+          <div class="stat-label">已过期</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+        <div class="search-bar" style="margin-bottom: 0;">
+          <select class="form-control" id="filterInsStatus">
+            <option value="">全部状态</option>
+            <option value="active">生效中</option>
+            <option value="expiring">即将到期</option>
+            <option value="expired">已过期</option>
+          </select>
+          <select class="form-control" id="filterInsCompany">
+            <option value="">全部保险公司</option>
+            <option value="平安保险">平安保险</option>
+            <option value="人保财险">人保财险</option>
+            <option value="太平洋保险">太平洋保险</option>
+          </select>
+          <input type="text" class="form-control" id="insSearch" placeholder="搜索车牌号/品牌..." onkeydown="if(event.key==='Enter')renderInsurances()">
+          <button class="btn btn-primary btn-sm" onclick="renderInsurances()">🔍 搜索</button>
+          <div class="column-toggle-btn" style="position:relative;">
+            <button class="btn btn-outline btn-sm" onclick="toggleColumnPanel()">⚙️ 列显示</button>
+            <div id="columnPanel" class="column-toggle-panel"></div>
+          </div>
+        </div>
+        <span style="display:flex; gap: 2em;">
+          <button class="btn btn-primary" onclick="openSyncModal()">📂 本地文件同步</button>
+          <button class="btn btn-primary" onclick="openInsModal()">＋ 新增车险记录</button>
+        </span>
+      </div>
+
+      <!-- 批量操作栏 -->
+      <div id="batchBar" style="display:none; margin-bottom:12px; padding:8px 12px; background:var(--primary-light); border-radius:var(--radius-sm); align-items:center; gap:10px; flex-wrap:wrap;">
+        <span style="font-size:13px; color:var(--text-secondary);">已选 <b id="batchCount">0</b> 条</span>
+        <button class="btn btn-outline btn-sm" onclick="batchUpdate('email_reminder', 1)">📧 开启邮件提醒</button>
+        <button class="btn btn-outline btn-sm" onclick="batchUpdate('email_reminder', 0)">🔕 关闭邮件提醒</button>
+        <select class="form-control btn-sm" style="width:auto;" onchange="if(this.value)batchUpdate('priority', this.value); this.value='';">
+          <option value="">批量设置等级...</option>
+          <option value="重要">重要</option>
+          <option value="普通">普通</option>
+          <option value="不重要">不重要</option>
+        </select>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th data-col="select"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" title="全选"></th>
+              <th data-col="id">ID</th>
+              <th data-col="plateNo">车牌号</th>
+              <th data-col="brand">品牌型号</th>
+              <th data-col="insuranceCompany">保险公司</th>
+              <th data-col="insuranceType">险种</th>
+              <th data-col="amount">保费金额</th>
+              <th data-col="agent">对接业务员</th>
+              <th data-col="createdAt">创建时间</th>
+              <th data-col="endDate">到期时间</th>
+              <th data-col="status">状态</th>
+              <th data-col="emailReminder">邮件提醒</th>
+              <th data-col="priority">重要等级</th>
+              <th data-col="filePath">本地文件</th>
+              <th data-col="remark">备注</th>
+              <th data-col="actions">操作</th>
+            </tr>
+          </thead>
+          <tbody id="insTableBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="insPagination"></div>
+    </div>
+  </main>
+
+  <!-- 新增/编辑模态框 -->
+  <div class="modal-backdrop" id="insModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="insModalTitle">新增车险记录</h2>
+        <button class="modal-close" onclick="closeModal('insModal')">&times;</button>
+      </div>
+      <form onsubmit="saveIns(event)">
+        <input type="hidden" id="insId">
+        <div class="form-row">
+          <div class="form-group">
+            <label>车牌号 *</label>
+            <input type="text" class="form-control" id="insPlateNo" required placeholder="京A12345">
+          </div>
+          <div class="form-group">
+            <label>品牌型号 *</label>
+            <input type="text" class="form-control" id="insBrand" required placeholder="别克 GL8">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>保险公司 *</label>
+            <select class="form-control" id="insCompany" required>
+              <option value="">请选择</option>
+              <option value="平安保险">平安保险</option>
+              <option value="人保财险">人保财险</option>
+              <option value="太平洋保险">太平洋保险</option>
+              <option value="大地保险">大地保险</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>险种 *</label>
+            <input type="text" class="form-control" id="insType" required placeholder="交强险+商业险">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>保费金额 *</label>
+            <input type="number" class="form-control" id="insAmount" required placeholder="0" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>对接业务员 *</label>
+            <input type="text" class="form-control" id="insAgent" required placeholder="请输入对接业务员">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>投保日期 *</label>
+            <input type="date" class="form-control" id="insCreateDate" required>
+          </div>
+          <div class="form-group">
+            <label>到期日期 *</label>
+            <input type="date" class="form-control" id="insExpireDate" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>附件上传</label>
+          <input type="file" class="form-control" id="insFile" style="padding:5px;">
+          <input type="hidden" id="insFilePath">
+          <small style="color:var(--text-muted);">选择文件后自动上传，或留空跳过</small>
+        </div>
+        <div class="form-group">
+          <label>备注</label>
+          <textarea class="form-control" id="insRemark" placeholder="备注信息（选填）"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="insEmailReminder" checked> 邮件提醒
+            </label>
+          </div>
+          <div class="form-group">
+            <label>重要等级</label>
+            <select class="form-control" id="insPriority">
+              <option value="重要">重要</option>
+              <option value="普通" selected>普通</option>
+              <option value="不重要">不重要</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('insModal')">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 详情模态框 -->
+  <div class="modal-backdrop" id="insDetailModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>车险详情</h2>
+        <button class="modal-close" onclick="closeModal('insDetailModal')">&times;</button>
+      </div>
+      <div id="insDetailContent"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('insDetailModal')">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 本地文件同步模态框 ===== -->
+  <div class="modal-backdrop" id="syncModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>📂 本地文件同步</h2>
+        <button class="modal-close" onclick="closeModal('syncModal')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>本地目录路径</label>
+        <input type="text" class="form-control" id="syncDirectory" placeholder="例如: D:\车险文件">
+        <small style="color:var(--text-muted);">输入包含车险文件的文件夹路径，点击"扫描"查看可导入的文件</small>
+      </div>
+      <div id="syncResult" style="max-height:300px; overflow-y:auto; margin:12px 0;"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('syncModal')">关闭</button>
+        <button type="button" class="btn btn-primary" id="syncScanBtn" onclick="scanDirectory()">🔍 扫描文件</button>
+        <button type="button" class="btn btn-primary" id="syncImportBtn" onclick="importFiles()" style="display:none;">📥 一键导入</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/app.js"></script>
+  <script>
+    let insPage = 1;
+    const insPageSize = 8;
+
+    async function loadInsurances() {
+      const params = { page: insPage, pageSize: insPageSize };
+      if (document.getElementById('filterInsStatus').value) params.status = document.getElementById('filterInsStatus').value;
+      if (document.getElementById('filterInsCompany').value) params.company = document.getElementById('filterInsCompany').value;
+      if (document.getElementById('insSearch').value) params.keyword = document.getElementById('insSearch').value;
+      try { const res = await API.get('/insurances', params); return res.data; }
+      catch (err) { showToast('加载失败: ' + err.message, 'error'); return { items: [], total: 0 }; }
+    }
+
+    function renderInsurances() { insPage = 1; renderInsTable(); }
+
+    async function renderInsTable() {
+      const data = await loadInsurances();
+      const tbody = document.getElementById('insTableBody');
+      document.getElementById('selectAll').checked = false;
+      updateBatchBar();
+
+      if (data.items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${getVisibleCount()}" style="text-align:center; padding:40px; color:var(--text-muted);">暂无数据</td></tr>`;
+      } else {
+        tbody.innerHTML = data.items.map(i => `
+          <tr>
+            <td data-col="select"><input type="checkbox" class="rowCheck" value="${i.id}" onchange="updateBatchBar()"></td>
+            <td data-col="id">${i.id}</td>
+            <td data-col="plateNo"><a href="javascript:viewIns(${i.id})">${i.plateNo}</a></td>
+            <td data-col="brand">${i.brand}</td>
+            <td data-col="insuranceCompany">${i.insuranceCompany}</td>
+            <td data-col="insuranceType">${i.insuranceType}</td>
+            <td data-col="amount">${formatMoney(i.amount)}</td>
+            <td data-col="agent">${i.agent}</td>
+            <td data-col="createdAt">${i.createdAt || i.createTime}</td>
+            <td data-col="endDate">${i.endDate || i.expireTime}</td>
+            <td data-col="status">${getStatusBadge(i.status)}</td>
+            <td data-col="emailReminder"><input type="checkbox" ${i.emailReminder !== false ? 'checked' : ''} onchange="toggleReminder('insurances', ${i.id}, this.checked)" title="邮件提醒"></td>
+            <td data-col="priority">${getPriorityBadge(i.priority)}</td>
+            <td data-col="filePath"><a href="javascript:void(0)" onclick="showToast('文件链接(模拟): ${i.filePath || '无'}', 'info')">📎 查看</a></td>
+            <td data-col="remark">${i.remark || '-'}</td>
+            <td data-col="actions">
+              <button class="btn btn-outline btn-sm" onclick="editIns(${i.id})">编辑</button>
+              <button class="btn btn-danger btn-sm admin-only" onclick="deleteIns(${i.id}, '${i.plateNo.replace(/'/g, "\\'")}')">删除</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      applyColumnVisibility();
+
+      // 更新统计卡片
+      try {
+        const stats = await API.get('/insurances/stats');
+        document.getElementById('totalCount').textContent = stats.data.total;
+        document.getElementById('activeCount').textContent = stats.data.active;
+        document.getElementById('expiringCount').textContent = stats.data.expiring;
+        document.getElementById('expiredCount').textContent = stats.data.expired;
+      } catch (e) { /* ignore stats errors */ }
+
+      const totalPages = Math.ceil(data.total / insPageSize);
+      const pag = document.getElementById('insPagination');
+      if (totalPages <= 1) { pag.innerHTML = ''; return; }
+      let html = `<button class="page-btn" onclick="goInsPage(${insPage - 1})" ${insPage === 1 ? 'disabled' : ''}>&laquo;</button>`;
+      for (let i = 1; i <= totalPages; i++) {
+        html += `<button class="page-btn ${i === insPage ? 'active' : ''}" onclick="goInsPage(${i})">${i}</button>`;
+      }
+      html += `<button class="page-btn" onclick="goInsPage(${insPage + 1})" ${insPage === totalPages ? 'disabled' : ''}>&raquo;</button>`;
+      pag.innerHTML = html;
+    }
+
+    function goInsPage(p) { insPage = p; renderInsTable(); }
+
+    async function deleteIns(id, plate) {
+      if (!confirm('确定删除车险记录「' + plate + '」吗？')) return;
+      try { await API.del('/insurances/' + id); showToast('车险记录已删除', 'success'); renderInsTable(); }
+      catch (err) { showToast('删除失败: ' + err.message, 'error'); }
+    }
+
+    function openInsModal() {
+      document.getElementById('insModalTitle').textContent = '新增车险记录';
+      const today = new Date().toISOString().substring(0, 10);
+      ['insId','insPlateNo','insBrand','insCompany','insType','insAmount','insAgent','insFilePath','insRemark'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('insCreateDate').value = today;
+      document.getElementById('insExpireDate').value = '';
+      document.getElementById('insFile').value = '';
+      document.getElementById('insEmailReminder').checked = true;
+      document.getElementById('insPriority').value = '普通';
+      openModal('insModal');
+    }
+
+    // Auto-upload file when selected
+    document.getElementById('insFile').addEventListener('change', async function() {
+      const file = this.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', '车险续期');
+      try {
+        const res = await API.upload('/files/upload', formData);
+        document.getElementById('insFilePath').value = res.data.storedPath;
+        showToast('文件已上传', 'success');
+      } catch (err) {
+        showToast('文件上传失败: ' + err.message, 'error');
+        this.value = '';
+      }
+    });
+
+    function editIns(id) {
+      API.get('/insurances/' + id).then(res => { const i = res.data;
+      document.getElementById('insModalTitle').textContent = '编辑车险记录';
+      document.getElementById('insId').value = i.id;
+      document.getElementById('insPlateNo').value = i.plateNo;
+      document.getElementById('insBrand').value = i.brand;
+      document.getElementById('insCompany').value = i.insuranceCompany;
+      document.getElementById('insType').value = i.insuranceType;
+      document.getElementById('insAmount').value = i.amount;
+      document.getElementById('insAgent').value = i.agent;
+      document.getElementById('insCreateDate').value = (i.startDate || '').substring(0, 10);
+      document.getElementById('insExpireDate').value = i.endDate;
+      document.getElementById('insFilePath').value = i.filePath || '';
+      document.getElementById('insRemark').value = i.remark || '';
+      document.getElementById('insEmailReminder').checked = i.emailReminder !== false;
+      document.getElementById('insPriority').value = i.priority || '普通';
+      openModal('insModal');
+    }).catch(err => showToast('获取车险失败: ' + err.message, 'error'));
+    }
+
+    async function saveIns(e) {
+      e.preventDefault();
+      const id = document.getElementById('insId').value;
+      const body = {
+        plateNo: document.getElementById('insPlateNo').value,
+        brand: document.getElementById('insBrand').value,
+        insuranceCompany: document.getElementById('insCompany').value,
+        insuranceType: document.getElementById('insType').value,
+        amount: parseFloat(document.getElementById('insAmount').value) || 0,
+        agent: document.getElementById('insAgent').value,
+        startDate: document.getElementById('insCreateDate').value,
+        endDate: document.getElementById('insExpireDate').value,
+        filePath: document.getElementById('insFilePath').value,
+        remark: document.getElementById('insRemark').value,
+        emailReminder: document.getElementById('insEmailReminder').checked,
+        priority: document.getElementById('insPriority').value,
+      };
+      try {
+        if (id) { await API.put('/insurances/' + id, body); showToast('车险记录已更新', 'success'); }
+        else { await API.post('/insurances', body); showToast('车险记录已添加', 'success'); }
+        closeModal('insModal'); renderInsTable();
+      } catch (err) { showToast('保存失败: ' + err.message, 'error'); }
+    }
+
+    async function viewIns(id) {
+      try { const res = await API.get('/insurances/' + id); const i = res.data;
+      document.getElementById('insDetailContent').innerHTML = `
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; font-size:13px;">
+          <div><strong>车牌号：</strong>${i.plateNo}</div>
+          <div><strong>品牌型号：</strong>${i.brand}</div>
+          <div><strong>保险公司：</strong>${i.insuranceCompany}</div>
+          <div><strong>险种：</strong>${i.insuranceType}</div>
+          <div><strong>保费金额：</strong>${formatMoney(i.amount)}</div>
+          <div><strong>对接业务员：</strong>${i.agent}</div>
+          <div><strong>创建时间：</strong>${i.createdAt || i.createTime}</div>
+          <div><strong>到期时间：</strong>${i.endDate || i.expireTime}</div>
+          <div><strong>状态：</strong>${getStatusBadge(i.status)}</div>
+          <div><strong>文件路径：</strong>${i.filePath || '无'}</div>
+          <div style="grid-column: 1/-1;"><strong>备注：</strong>${i.remark || '无'}</div>
+        </div>
+      `;
+      openModal('insDetailModal');
+      } catch (err) { showToast('加载失败: ' + err.message, 'error'); }
+    }
+
+    // ---- 本地文件同步 ----
+    let syncNewFiles = [];
+
+    function openSyncModal() {
+      document.getElementById('syncDirectory').value = '';
+      document.getElementById('syncResult').innerHTML = '';
+      document.getElementById('syncImportBtn').style.display = 'none';
+      syncNewFiles = [];
+      openModal('syncModal');
+    }
+
+    async function scanDirectory() {
+      const dir = document.getElementById('syncDirectory').value.trim();
+      if (!dir) { showToast('请输入目录路径', 'error'); return; }
+      const btn = document.getElementById('syncScanBtn');
+      btn.disabled = true; btn.textContent = '扫描中...';
+      try {
+        const res = await API.post('/scan', { directory: dir, module: 'insurance' });
+        const d = res.data;
+        syncNewFiles = d.newFiles;
+        let html = `<div style="margin-bottom:8px; color:var(--text-muted);">
+          共 ${d.total} 个文件，其中 <b style="color:var(--success);">${d.newCount}</b> 个待导入，<b>${d.existingCount}</b> 个已存在</div>`;
+        if (d.newFiles.length > 0) {
+          html += '<table><thead><tr><th>文件名</th><th>大小</th></tr></thead><tbody>';
+          d.newFiles.forEach(f => {
+            html += `<tr><td>📄 ${f.name}</td><td>${(f.size / 1024).toFixed(1)} KB</td></tr>`;
+          });
+          html += '</tbody></table>';
+          document.getElementById('syncImportBtn').style.display = '';
+        } else if (d.total === 0) {
+          html += '<p style="color:var(--text-muted);">目录为空，未找到支持的文件</p>';
+        } else {
+          html += '<p style="color:var(--text-muted);">所有文件已同步，无需导入</p>';
+        }
+        document.getElementById('syncResult').innerHTML = html;
+      } catch (err) { showToast('扫描失败: ' + err.message, 'error'); }
+      finally { btn.disabled = false; btn.textContent = '🔍 扫描文件'; }
+    }
+
+    async function importFiles() {
+      if (syncNewFiles.length === 0) { showToast('没有可导入的文件', 'error'); return; }
+      const btn = document.getElementById('syncImportBtn');
+      btn.disabled = true; btn.textContent = '导入中...';
+      try {
+        const res = await API.post('/scan/import', {
+          module: 'insurance',
+          files: syncNewFiles,
+          category: ''
+        });
+        showToast(res.message, 'success');
+        closeModal('syncModal');
+        renderInsTable();
+      } catch (err) { showToast('导入失败: ' + err.message, 'error'); }
+      finally { btn.disabled = false; btn.textContent = '📥 一键导入'; }
+    }
+
+    function toggleSelectAll() {
+      const checked = document.getElementById('selectAll').checked;
+      document.querySelectorAll('.rowCheck').forEach(cb => cb.checked = checked);
+      updateBatchBar();
+    }
+
+    function updateBatchBar() {
+      const checked = document.querySelectorAll('.rowCheck:checked');
+      const count = checked.length;
+      document.getElementById('batchCount').textContent = count;
+      document.getElementById('batchBar').style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    function getCheckedIds() {
+      return Array.from(document.querySelectorAll('.rowCheck:checked')).map(cb => parseInt(cb.value));
+    }
+
+    async function toggleReminder(table, id, checked) {
+      try {
+        await API.put(`/${table}/batch`, { ids: [id], field: 'email_reminder', value: checked ? 1 : 0 });
+        showToast(checked ? '邮件提醒已开启' : '邮件提醒已关闭', 'success');
+      } catch (err) { showToast('操作失败: ' + err.message, 'error'); renderInsTable(); }
+    }
+
+    async function batchUpdate(field, value) {
+      const ids = getCheckedIds();
+      if (ids.length === 0) { showToast('请先选择记录', 'error'); return; }
+      try {
+        await API.put('/insurances/batch', { ids, field, value });
+        const labelMap = { email_reminder: value == 1 ? '开启邮件提醒' : '关闭邮件提醒', priority: '设置等级为' + value };
+        showToast(`已批量${labelMap[field] || '更新'} ${ids.length} 条`, 'success');
+        renderInsTable();
+      } catch (err) { showToast('批量操作失败: ' + err.message, 'error'); }
+    }
+
+    function getPriorityBadge(priority) {
+      const p = priority || '普通';
+      const colorMap = { '重要': 'var(--danger)', '普通': 'var(--text-muted)', '不重要': 'var(--success)' };
+      const bgMap = { '重要': '#fff2f0', '普通': '#fafafa', '不重要': '#f6ffed' };
+      const borderMap = { '重要': '#ffccc7', '普通': '#d9d9d9', '不重要': '#b7eb8f' };
+      return `<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500;color:${colorMap[p]};background:${bgMap[p]};border:1px solid ${borderMap[p]};">${p}</span>`;
+    }
+
+    // ---- 列显示配置 ----
+    const COLUMN_CONFIG = [
+      { key: 'id', label: 'ID', defaultVisible: false },
+      { key: 'plateNo', label: '车牌号', defaultVisible: true },
+      { key: 'brand', label: '品牌型号', defaultVisible: false },
+      { key: 'insuranceCompany', label: '保险公司', defaultVisible: true },
+      { key: 'insuranceType', label: '险种', defaultVisible: true },
+      { key: 'amount', label: '保费金额', defaultVisible: false },
+      { key: 'agent', label: '对接业务员', defaultVisible: true },
+      { key: 'createdAt', label: '创建时间', defaultVisible: false },
+      { key: 'endDate', label: '到期时间', defaultVisible: true },
+      { key: 'status', label: '状态', defaultVisible: true },
+      { key: 'emailReminder', label: '邮件提醒', defaultVisible: false },
+      { key: 'priority', label: '重要等级', defaultVisible: false },
+      { key: 'filePath', label: '本地文件', defaultVisible: false },
+      { key: 'remark', label: '备注', defaultVisible: true },
+    ];
+
+    function loadColumnConfig() {
+      try {
+        const saved = localStorage.getItem('insuranceColumns');
+        if (saved) return JSON.parse(saved);
+      } catch (e) { /* ignore */ }
+      const cfg = {};
+      COLUMN_CONFIG.forEach(c => cfg[c.key] = c.defaultVisible);
+      return cfg;
+    }
+
+    function saveColumnConfig(cfg) {
+      localStorage.setItem('insuranceColumns', JSON.stringify(cfg));
+    }
+
+    function applyColumnVisibility() {
+      const cfg = loadColumnConfig();
+      document.querySelectorAll('#insTableBody td[data-col], thead th[data-col]').forEach(el => {
+        const col = el.getAttribute('data-col');
+        if (col === 'select' || col === 'actions') return;
+        if (cfg[col]) {
+          el.classList.remove('col-hidden');
+        } else {
+          el.classList.add('col-hidden');
+        }
+      });
+    }
+
+    function getVisibleCount() {
+      const cfg = loadColumnConfig();
+      let count = 2; // select + actions always visible
+      COLUMN_CONFIG.forEach(c => { if (cfg[c.key]) count++; });
+      return count;
+    }
+
+    function toggleColumnPanel() {
+      const panel = document.getElementById('columnPanel');
+      const isOpen = panel.classList.contains('show');
+      if (isOpen) {
+        panel.classList.remove('show');
+      } else {
+        renderColumnPanel();
+        panel.classList.add('show');
+      }
+    }
+
+    function renderColumnPanel() {
+      const cfg = loadColumnConfig();
+      const panel = document.getElementById('columnPanel');
+      panel.innerHTML = COLUMN_CONFIG.map(c => `
+        <label>
+          <input type="checkbox" ${cfg[c.key] ? 'checked' : ''} onchange="onColumnToggle('${c.key}', this.checked)">
+          ${c.label}
+        </label>
+      `).join('');
+    }
+
+    function onColumnToggle(key, checked) {
+      const cfg = loadColumnConfig();
+      cfg[key] = checked;
+      saveColumnConfig(cfg);
+      applyColumnVisibility();
+    }
+
+    // Close panel on outside click
+    document.addEventListener('click', function(e) {
+      const panel = document.getElementById('columnPanel');
+      if (!panel) return;
+      const btn = e.target.closest('.column-toggle-btn');
+      if (!btn && panel.classList.contains('show')) {
+        panel.classList.remove('show');
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', renderInsTable);
+  </script>
+</body>
+</html>

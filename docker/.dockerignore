@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+*.md
+requirement/
+scripts/
+node_modules/
+.env
+*.log
+*.db
+backend/uploads/*
+!backend/uploads/.gitkeep

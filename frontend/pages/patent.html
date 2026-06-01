@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>专利管理 - 素珍管理系统</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <!-- ===== 顶部导航栏 ===== -->
+  <nav class="navbar">
+    <div class="logo" style="display: flex; align-items: center; gap: 10px;">
+      <button class="menu-toggle" id="menuToggle" title="菜单">&#9776;</button>
+      <span>🌐 素珍管理系统</span>
+    </div>
+    <div class="nav-links">
+      <a href="dashboard.html">仪表盘</a>
+      <a href="contract.html">合同管理</a>
+      <a href="patent.html" class="active">专利管理</a>
+      <a href="insurance.html">车险续期</a>
+      <a href="files.html">文件管理</a>
+      <a href="users.html" class="admin-only">用户管理</a>
+      <a href="settings.html" class="admin-only">系统配置</a>
+      <a href="logs.html">系统日志</a>
+      <a href="export.html">数据导出</a>
+    </div>
+    <div class="nav-user">
+      <span style="font-size:13px;" id="navUserName">管理员</span>
+      <span class="avatar" id="navUserAvatar">管</span>
+      <a href="javascript:handleLogout()" class="btn btn-outline btn-sm">退出</a>
+    </div>
+  </nav>
+
+  <!-- ===== 侧边栏 ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="menu-group">
+      <div class="menu-group-title">主菜单</div>
+      <a href="dashboard.html" class="menu-item">
+        <span class="icon">📊</span> 仪表盘
+      </a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">业务管理</div>
+      <a href="contract.html" class="menu-item">
+        <span class="icon">📋</span> 合同管理
+      </a>
+      <a href="patent.html" class="menu-item active">
+        <span class="icon">💡</span> 专利管理
+      </a>
+      <a href="insurance.html" class="menu-item">
+        <span class="icon">🚗</span> 车险续期
+      </a>
+      <a href="files.html" class="menu-item">
+        <span class="icon">📁</span> 文件管理
+      </a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">系统管理</div>
+      <a href="users.html" class="menu-item admin-only">
+        <span class="icon">👥</span> 用户管理
+      </a>
+      <a href="settings.html" class="menu-item admin-only">
+        <span class="icon">⚙️</span> 系统配置
+      </a>
+      <a href="logs.html" class="menu-item">
+        <span class="icon">📜</span> 系统日志
+      </a>
+      <a href="export.html" class="menu-item">
+        <span class="icon">📤</span> 数据导出
+      </a>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ===== 主内容区 ===== -->
+  <main class="main-content">
+    <div class="page-header">
+      <h1>💡 专利管理</h1>
+      <div class="breadcrumb">首页 / 专利管理</div>
+    </div>
+
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+        <div class="search-bar" style="margin-bottom: 0;">
+          <select class="form-control" id="filterPatentType">
+            <option value="">全部类型</option>
+            <option value="发明专利">发明专利</option>
+            <option value="实用新型">实用新型</option>
+            <option value="外观设计">外观设计</option>
+          </select>
+          <select class="form-control" id="filterPatentStatus">
+            <option value="">全部状态</option>
+            <option value="active">生效中</option>
+            <option value="pending">待审核</option>
+            <option value="expired">已到期</option>
+          </select>
+          <input type="text" class="form-control" id="patentSearch" placeholder="搜索专利名称/专利号..." onkeydown="if(event.key==='Enter')renderPatents()">
+          <button class="btn btn-primary btn-sm" onclick="renderPatents()">🔍 搜索</button>
+          <div class="column-toggle-btn" style="position:relative;">
+            <button class="btn btn-outline btn-sm" onclick="toggleColumnPanel()">⚙️ 列显示</button>
+            <div id="columnPanel" class="column-toggle-panel"></div>
+          </div>
+        </div>
+        <span style="display:flex; gap: 2em;">
+          <button class="btn btn-primary" onclick="openSyncModal()">📂 本地文件同步</button>
+          <button class="btn btn-primary" onclick="openPatentModal()">＋ 新增专利</button>
+        </span>
+      </div>
+
+      <!-- 批量操作栏 -->
+      <div id="batchBar" style="display:none; margin-bottom:12px; padding:8px 12px; background:var(--primary-light); border-radius:var(--radius-sm); align-items:center; gap:10px; flex-wrap:wrap;">
+        <span style="font-size:13px; color:var(--text-secondary);">已选 <b id="batchCount">0</b> 条</span>
+        <button class="btn btn-outline btn-sm" onclick="batchUpdate('email_reminder', 1)">📧 开启邮件提醒</button>
+        <button class="btn btn-outline btn-sm" onclick="batchUpdate('email_reminder', 0)">🔕 关闭邮件提醒</button>
+        <select class="form-control btn-sm" style="width:auto;" onchange="if(this.value)batchUpdate('priority', this.value); this.value='';">
+          <option value="">批量设置等级...</option>
+          <option value="重要">重要</option>
+          <option value="普通">普通</option>
+          <option value="不重要">不重要</option>
+        </select>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th data-col="select"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" title="全选"></th>
+              <th data-col="id">ID</th>
+              <th data-col="name">专利名称</th>
+              <th data-col="patentNo">专利号</th>
+              <th data-col="type">类型</th>
+              <th data-col="holder">权利人</th>
+              <th data-col="agent">对接业务员</th>
+              <th data-col="createdAt">创建时间</th>
+              <th data-col="expireDate">到期时间</th>
+              <th data-col="status">状态</th>
+              <th data-col="emailReminder">邮件提醒</th>
+              <th data-col="priority">重要等级</th>
+              <th data-col="filePath">本地文件</th>
+              <th data-col="remark">备注</th>
+              <th data-col="actions">操作</th>
+            </tr>
+          </thead>
+          <tbody id="patentTableBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="patentPagination"></div>
+    </div>
+  </main>
+
+  <!-- ===== 新增/编辑专利模态框 ===== -->
+  <div class="modal-backdrop" id="patentModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="patentModalTitle">新增专利</h2>
+        <button class="modal-close" onclick="closeModal('patentModal')">&times;</button>
+      </div>
+      <form onsubmit="savePatent(event)">
+        <input type="hidden" id="patentId">
+        <div class="form-group">
+          <label>专利名称 *</label>
+          <input type="text" class="form-control" id="patentName" required placeholder="请输入专利名称">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>专利号 *</label>
+            <input type="text" class="form-control" id="patentNo" required placeholder="ZL2024...">
+          </div>
+          <div class="form-group">
+            <label>专利类型 *</label>
+            <select class="form-control" id="patentType" required>
+              <option value="">请选择</option>
+              <option value="发明专利">发明专利</option>
+              <option value="实用新型">实用新型</option>
+              <option value="外观设计">外观设计</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>权利人 *</label>
+            <input type="text" class="form-control" id="patentHolder" required placeholder="请输入权利人">
+          </div>
+          <div class="form-group">
+            <label>对接业务员 *</label>
+            <input type="text" class="form-control" id="patentAgent" required placeholder="请输入对接业务员">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>申请日期 *</label>
+            <input type="date" class="form-control" id="patentCreateDate" required>
+          </div>
+          <div class="form-group">
+            <label>到期日期 *</label>
+            <input type="date" class="form-control" id="patentExpireDate" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>附件上传</label>
+          <input type="file" class="form-control" id="patentFile" style="padding:5px;">
+          <input type="hidden" id="patentFilePath">
+          <small style="color:var(--text-muted);">选择文件后自动上传，或留空跳过</small>
+        </div>
+        <div class="form-group">
+          <label>备注</label>
+          <textarea class="form-control" id="patentRemark" placeholder="备注信息（选填）"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="patentEmailReminder" checked> 邮件提醒
+            </label>
+          </div>
+          <div class="form-group">
+            <label>重要等级</label>
+            <select class="form-control" id="patentPriority">
+              <option value="重要">重要</option>
+              <option value="普通" selected>普通</option>
+              <option value="不重要">不重要</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('patentModal')">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== 查看详情模态框 ===== -->
+  <div class="modal-backdrop" id="patentDetailModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>专利详情</h2>
+        <button class="modal-close" onclick="closeModal('patentDetailModal')">&times;</button>
+      </div>
+      <div id="patentDetailContent"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('patentDetailModal')">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 本地文件同步模态框 ===== -->
+  <div class="modal-backdrop" id="syncModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>📂 本地文件同步</h2>
+        <button class="modal-close" onclick="closeModal('syncModal')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>本地目录路径</label>
+        <input type="text" class="form-control" id="syncDirectory" placeholder="例如: D:\专利文件">
+        <small style="color:var(--text-muted);">输入包含专利文件的文件夹路径，点击"扫描"查看可导入的文件</small>
+      </div>
+      <div id="syncResult" style="max-height:300px; overflow-y:auto; margin:12px 0;"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('syncModal')">关闭</button>
+        <button type="button" class="btn btn-primary" id="syncScanBtn" onclick="scanDirectory()">🔍 扫描文件</button>
+        <button type="button" class="btn btn-primary" id="syncImportBtn" onclick="importFiles()" style="display:none;">📥 一键导入</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/app.js"></script>
+  <script>
+    let patentPage = 1;
+    const patentPageSize = 8;
+
+    async function loadPatents() {
+      const params = { page: patentPage, pageSize: patentPageSize };
+      if (document.getElementById('filterPatentType').value) params.type = document.getElementById('filterPatentType').value;
+      if (document.getElementById('filterPatentStatus').value) params.status = document.getElementById('filterPatentStatus').value;
+      if (document.getElementById('patentSearch').value) params.keyword = document.getElementById('patentSearch').value;
+      try { const res = await API.get('/patents', params); return res.data; }
+      catch (err) { showToast('加载失败: ' + err.message, 'error'); return { items: [], total: 0 }; }
+    }
+
+    function renderPatents() { patentPage = 1; renderPatentTable(); }
+
+    async function renderPatentTable() {
+      const data = await loadPatents();
+      const tbody = document.getElementById('patentTableBody');
+      document.getElementById('selectAll').checked = false;
+      updateBatchBar();
+
+      if (data.items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${getVisibleCount()}" style="text-align:center; padding:40px; color:var(--text-muted);">暂无数据</td></tr>`;
+      } else {
+        tbody.innerHTML = data.items.map(p => `
+          <tr>
+            <td data-col="select"><input type="checkbox" class="rowCheck" value="${p.id}" onchange="updateBatchBar()"></td>
+            <td data-col="id">${p.id}</td>
+            <td data-col="name"><a href="javascript:viewPatent(${p.id})">${p.name}</a></td>
+            <td data-col="patentNo">${p.patentNo}</td>
+            <td data-col="type">${p.type}</td>
+            <td data-col="holder">${p.holder}</td>
+            <td data-col="agent">${p.agent}</td>
+            <td data-col="createdAt">${p.createdAt || p.createTime}</td>
+            <td data-col="expireDate">${p.expireDate}</td>
+            <td data-col="status">${getStatusBadge(p.status)}</td>
+            <td data-col="emailReminder"><input type="checkbox" ${p.emailReminder !== false ? 'checked' : ''} onchange="toggleReminder('patents', ${p.id}, this.checked)" title="邮件提醒"></td>
+            <td data-col="priority">${getPriorityBadge(p.priority)}</td>
+            <td data-col="filePath"><a href="javascript:void(0)" onclick="showToast('文件链接(模拟): ${p.filePath}', 'info')">📎 查看</a></td>
+            <td data-col="remark">${p.remark || '-'}</td>
+            <td data-col="actions">
+              <button class="btn btn-outline btn-sm" onclick="editPatent(${p.id})">编辑</button>
+              <button class="btn btn-danger btn-sm admin-only" onclick="deletePatent(${p.id}, '${p.name.replace(/'/g, "\\'")}')">删除</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      applyColumnVisibility();
+
+      const totalPages = Math.ceil(data.total / patentPageSize);
+      const pag = document.getElementById('patentPagination');
+      if (totalPages <= 1) { pag.innerHTML = ''; return; }
+      let html = `<button class="page-btn" onclick="goPatentPage(${patentPage - 1})" ${patentPage === 1 ? 'disabled' : ''}>&laquo;</button>`;
+      for (let i = 1; i <= totalPages; i++) {
+        html += `<button class="page-btn ${i === patentPage ? 'active' : ''}" onclick="goPatentPage(${i})">${i}</button>`;
+      }
+      html += `<button class="page-btn" onclick="goPatentPage(${patentPage + 1})" ${patentPage === totalPages ? 'disabled' : ''}>&raquo;</button>`;
+      pag.innerHTML = html;
+    }
+
+    function goPatentPage(p) { patentPage = p; renderPatentTable(); }
+
+    async function deletePatent(id, name) {
+      if (!confirm('确定删除专利「' + name + '」吗？')) return;
+      try { await API.del('/patents/' + id); showToast('专利已删除', 'success'); renderPatentTable(); }
+      catch (err) { showToast('删除失败: ' + err.message, 'error'); }
+    }
+
+    function openPatentModal() {
+      document.getElementById('patentModalTitle').textContent = '新增专利';
+      const today = new Date().toISOString().substring(0, 10);
+      ['patentId','patentName','patentNo','patentType','patentHolder','patentAgent','patentFilePath','patentRemark'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('patentCreateDate').value = today;
+      document.getElementById('patentExpireDate').value = '';
+      document.getElementById('patentFile').value = '';
+      document.getElementById('patentEmailReminder').checked = true;
+      document.getElementById('patentPriority').value = '普通';
+      openModal('patentModal');
+    }
+
+    // Auto-upload file when selected
+    document.getElementById('patentFile').addEventListener('change', async function() {
+      const file = this.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', '专利');
+      try {
+        const res = await API.upload('/files/upload', formData);
+        document.getElementById('patentFilePath').value = res.data.storedPath;
+        showToast('文件已上传', 'success');
+      } catch (err) {
+        showToast('文件上传失败: ' + err.message, 'error');
+        this.value = '';
+      }
+    });
+
+    function editPatent(id) {
+      API.get('/patents/' + id).then(res => { const p = res.data;
+      document.getElementById('patentModalTitle').textContent = '编辑专利';
+      document.getElementById('patentId').value = p.id;
+      document.getElementById('patentName').value = p.name;
+      document.getElementById('patentNo').value = p.patentNo;
+      document.getElementById('patentType').value = p.type;
+      document.getElementById('patentHolder').value = p.holder;
+      document.getElementById('patentAgent').value = p.agent;
+      document.getElementById('patentCreateDate').value = (p.applicationDate || p.createdAt || '').substring(0, 10);
+      document.getElementById('patentExpireDate').value = p.expireDate;
+      document.getElementById('patentFilePath').value = p.filePath || '';
+      document.getElementById('patentRemark').value = p.remark || '';
+      document.getElementById('patentEmailReminder').checked = p.emailReminder !== false;
+      document.getElementById('patentPriority').value = p.priority || '普通';
+      openModal('patentModal');
+    }).catch(err => showToast('获取专利失败: ' + err.message, 'error'));
+    }
+
+    async function savePatent(e) {
+      e.preventDefault();
+      const id = document.getElementById('patentId').value;
+      const body = {
+        name: document.getElementById('patentName').value,
+        patentNo: document.getElementById('patentNo').value,
+        type: document.getElementById('patentType').value,
+        holder: document.getElementById('patentHolder').value,
+        agent: document.getElementById('patentAgent').value,
+        applicationDate: document.getElementById('patentCreateDate').value,
+        expireDate: document.getElementById('patentExpireDate').value,
+        filePath: document.getElementById('patentFilePath').value,
+        remark: document.getElementById('patentRemark').value,
+        emailReminder: document.getElementById('patentEmailReminder').checked,
+        priority: document.getElementById('patentPriority').value,
+      };
+      try {
+        if (id) { await API.put('/patents/' + id, body); showToast('专利已更新', 'success'); }
+        else { await API.post('/patents', body); showToast('专利已添加', 'success'); }
+        closeModal('patentModal'); renderPatentTable();
+      } catch (err) { showToast('保存失败: ' + err.message, 'error'); }
+    }
+
+    async function viewPatent(id) {
+      try { const res = await API.get('/patents/' + id); const p = res.data;
+      document.getElementById('patentDetailContent').innerHTML = `
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; font-size:13px;">
+          <div><strong>专利名称：</strong>${p.name}</div>
+          <div><strong>专利号：</strong>${p.patentNo}</div>
+          <div><strong>类型：</strong>${p.type}</div>
+          <div><strong>权利人：</strong>${p.holder}</div>
+          <div><strong>对接业务员：</strong>${p.agent}</div>
+          <div><strong>状态：</strong>${getStatusBadge(p.status)}</div>
+          <div><strong>创建时间：</strong>${p.createdAt || p.createTime}</div>
+          <div><strong>到期时间：</strong>${p.expireDate || p.expireTime}</div>
+          <div><strong>文件路径：</strong>${p.filePath}</div>
+          <div style="grid-column: 1/-1;"><strong>备注：</strong>${p.remark || '无'}</div>
+        </div>
+      `;
+      openModal('patentDetailModal');
+      } catch (err) { showToast('加载详情失败: ' + err.message, 'error'); }
+    }
+
+    // ---- 本地文件同步 ----
+    let syncNewFiles = [];
+
+    function openSyncModal() {
+      document.getElementById('syncDirectory').value = '';
+      document.getElementById('syncResult').innerHTML = '';
+      document.getElementById('syncImportBtn').style.display = 'none';
+      syncNewFiles = [];
+      openModal('syncModal');
+    }
+
+    async function scanDirectory() {
+      const dir = document.getElementById('syncDirectory').value.trim();
+      if (!dir) { showToast('请输入目录路径', 'error'); return; }
+      const btn = document.getElementById('syncScanBtn');
+      btn.disabled = true; btn.textContent = '扫描中...';
+      try {
+        const res = await API.post('/scan', { directory: dir, module: 'patent' });
+        const d = res.data;
+        syncNewFiles = d.newFiles;
+        let html = `<div style="margin-bottom:8px; color:var(--text-muted);">
+          共 ${d.total} 个文件，其中 <b style="color:var(--success);">${d.newCount}</b> 个待导入，<b>${d.existingCount}</b> 个已存在</div>`;
+        if (d.newFiles.length > 0) {
+          html += '<table><thead><tr><th>文件名</th><th>大小</th></tr></thead><tbody>';
+          d.newFiles.forEach(f => {
+            html += `<tr><td>📄 ${f.name}</td><td>${(f.size / 1024).toFixed(1)} KB</td></tr>`;
+          });
+          html += '</tbody></table>';
+          document.getElementById('syncImportBtn').style.display = '';
+        } else if (d.total === 0) {
+          html += '<p style="color:var(--text-muted);">目录为空，未找到支持的文件</p>';
+        } else {
+          html += '<p style="color:var(--text-muted);">所有文件已同步，无需导入</p>';
+        }
+        document.getElementById('syncResult').innerHTML = html;
+      } catch (err) { showToast('扫描失败: ' + err.message, 'error'); }
+      finally { btn.disabled = false; btn.textContent = '🔍 扫描文件'; }
+    }
+
+    async function importFiles() {
+      if (syncNewFiles.length === 0) { showToast('没有可导入的文件', 'error'); return; }
+      const btn = document.getElementById('syncImportBtn');
+      btn.disabled = true; btn.textContent = '导入中...';
+      try {
+        const res = await API.post('/scan/import', {
+          module: 'patent',
+          files: syncNewFiles,
+          category: ''
+        });
+        showToast(res.message, 'success');
+        closeModal('syncModal');
+        renderPatentTable();
+      } catch (err) { showToast('导入失败: ' + err.message, 'error'); }
+      finally { btn.disabled = false; btn.textContent = '📥 一键导入'; }
+    }
+
+    // ---- 批量操作 & 邮件提醒 ----
+    function toggleSelectAll() {
+      const checked = document.getElementById('selectAll').checked;
+      document.querySelectorAll('.rowCheck').forEach(cb => cb.checked = checked);
+      updateBatchBar();
+    }
+
+    function updateBatchBar() {
+      const checked = document.querySelectorAll('.rowCheck:checked');
+      const count = checked.length;
+      document.getElementById('batchCount').textContent = count;
+      document.getElementById('batchBar').style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    function getCheckedIds() {
+      return Array.from(document.querySelectorAll('.rowCheck:checked')).map(cb => parseInt(cb.value));
+    }
+
+    async function toggleReminder(table, id, checked) {
+      try {
+        await API.put(`/${table}/batch`, { ids: [id], field: 'email_reminder', value: checked ? 1 : 0 });
+        showToast(checked ? '邮件提醒已开启' : '邮件提醒已关闭', 'success');
+      } catch (err) { showToast('操作失败: ' + err.message, 'error'); renderPatentTable(); }
+    }
+
+    async function batchUpdate(field, value) {
+      const ids = getCheckedIds();
+      if (ids.length === 0) { showToast('请先选择记录', 'error'); return; }
+      try {
+        await API.put('/patents/batch', { ids, field, value });
+        const labelMap = { email_reminder: value == 1 ? '开启邮件提醒' : '关闭邮件提醒', priority: '设置等级为' + value };
+        showToast(`已批量${labelMap[field] || '更新'} ${ids.length} 条`, 'success');
+        renderPatentTable();
+      } catch (err) { showToast('批量操作失败: ' + err.message, 'error'); }
+    }
+
+    function getPriorityBadge(priority) {
+      const p = priority || '普通';
+      const colorMap = { '重要': 'var(--danger)', '普通': 'var(--text-muted)', '不重要': 'var(--success)' };
+      const bgMap = { '重要': '#fff2f0', '普通': '#fafafa', '不重要': '#f6ffed' };
+      const borderMap = { '重要': '#ffccc7', '普通': '#d9d9d9', '不重要': '#b7eb8f' };
+      return `<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500;color:${colorMap[p]};background:${bgMap[p]};border:1px solid ${borderMap[p]};">${p}</span>`;
+    }
+
+    // ---- 列显示配置 ----
+    const COLUMN_CONFIG = [
+      { key: 'id', label: 'ID', defaultVisible: false },
+      { key: 'name', label: '专利名称', defaultVisible: true },
+      { key: 'patentNo', label: '专利号', defaultVisible: false },
+      { key: 'type', label: '类型', defaultVisible: true },
+      { key: 'holder', label: '权利人', defaultVisible: true },
+      { key: 'agent', label: '对接业务员', defaultVisible: true },
+      { key: 'createdAt', label: '创建时间', defaultVisible: false },
+      { key: 'expireDate', label: '到期时间', defaultVisible: true },
+      { key: 'status', label: '状态', defaultVisible: true },
+      { key: 'emailReminder', label: '邮件提醒', defaultVisible: false },
+      { key: 'priority', label: '重要等级', defaultVisible: false },
+      { key: 'filePath', label: '本地文件', defaultVisible: false },
+      { key: 'remark', label: '备注', defaultVisible: true },
+    ];
+
+    function loadColumnConfig() {
+      try {
+        const saved = localStorage.getItem('patentColumns');
+        if (saved) return JSON.parse(saved);
+      } catch (e) { /* ignore */ }
+      const cfg = {};
+      COLUMN_CONFIG.forEach(c => cfg[c.key] = c.defaultVisible);
+      return cfg;
+    }
+
+    function saveColumnConfig(cfg) {
+      localStorage.setItem('patentColumns', JSON.stringify(cfg));
+    }
+
+    function applyColumnVisibility() {
+      const cfg = loadColumnConfig();
+      document.querySelectorAll('#patentTableBody td[data-col], thead th[data-col]').forEach(el => {
+        const col = el.getAttribute('data-col');
+        if (col === 'select' || col === 'actions') return;
+        if (cfg[col]) {
+          el.classList.remove('col-hidden');
+        } else {
+          el.classList.add('col-hidden');
+        }
+      });
+    }
+
+    function getVisibleCount() {
+      const cfg = loadColumnConfig();
+      let count = 2; // select + actions always visible
+      COLUMN_CONFIG.forEach(c => { if (cfg[c.key]) count++; });
+      return count;
+    }
+
+    function toggleColumnPanel() {
+      const panel = document.getElementById('columnPanel');
+      const isOpen = panel.classList.contains('show');
+      if (isOpen) {
+        panel.classList.remove('show');
+      } else {
+        renderColumnPanel();
+        panel.classList.add('show');
+      }
+    }
+
+    function renderColumnPanel() {
+      const cfg = loadColumnConfig();
+      const panel = document.getElementById('columnPanel');
+      panel.innerHTML = COLUMN_CONFIG.map(c => `
+        <label>
+          <input type="checkbox" ${cfg[c.key] ? 'checked' : ''} onchange="onColumnToggle('${c.key}', this.checked)">
+          ${c.label}
+        </label>
+      `).join('');
+    }
+
+    function onColumnToggle(key, checked) {
+      const cfg = loadColumnConfig();
+      cfg[key] = checked;
+      saveColumnConfig(cfg);
+      applyColumnVisibility();
+    }
+
+    // Close panel on outside click
+    document.addEventListener('click', function(e) {
+      const panel = document.getElementById('columnPanel');
+      if (!panel) return;
+      const btn = e.target.closest('.column-toggle-btn');
+      if (!btn && panel.classList.contains('show')) {
+        panel.classList.remove('show');
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', renderPatentTable);
+  </script>
+</body>
+</html>

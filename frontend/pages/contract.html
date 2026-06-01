@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>合同管理 - 素珍管理系统</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <!-- ===== 顶部导航栏 ===== -->
+  <nav class="navbar">
+    <div class="logo" style="display: flex; align-items: center; gap: 10px;">
+      <button class="menu-toggle" id="menuToggle" title="菜单">&#9776;</button>
+      <span>🌐 素珍管理系统</span>
+    </div>
+    <div class="nav-links">
+      <a href="dashboard.html">仪表盘</a>
+      <a href="contract.html" class="active">合同管理</a>
+      <a href="patent.html">专利管理</a>
+      <a href="insurance.html">车险续期</a>
+      <a href="files.html">文件管理</a>
+      <a href="users.html" class="admin-only">用户管理</a>
+      <a href="settings.html" class="admin-only">系统配置</a>
+      <a href="logs.html">系统日志</a>
+      <a href="export.html">数据导出</a>
+    </div>
+    <div class="nav-user">
+      <span style="font-size:13px;" id="navUserName">管理员</span>
+      <span class="avatar" id="navUserAvatar">管</span>
+      <a href="javascript:handleLogout()" class="btn btn-outline btn-sm">退出</a>
+    </div>
+  </nav>
+
+  <!-- ===== 侧边栏 ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="menu-group">
+      <div class="menu-group-title">主菜单</div>
+      <a href="dashboard.html" class="menu-item">
+        <span class="icon">📊</span> 仪表盘
+      </a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">业务管理</div>
+      <a href="contract.html" class="menu-item active">
+        <span class="icon">📋</span> 合同管理
+      </a>
+      <a href="patent.html" class="menu-item">
+        <span class="icon">💡</span> 专利管理
+      </a>
+      <a href="insurance.html" class="menu-item">
+        <span class="icon">🚗</span> 车险续期
+      </a>
+      <a href="files.html" class="menu-item">
+        <span class="icon">📁</span> 文件管理
+      </a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">系统管理</div>
+      <a href="users.html" class="menu-item admin-only">
+        <span class="icon">👥</span> 用户管理
+      </a>
+      <a href="settings.html" class="menu-item admin-only">
+        <span class="icon">⚙️</span> 系统配置
+      </a>
+      <a href="logs.html" class="menu-item">
+        <span class="icon">📜</span> 系统日志
+      </a>
+      <a href="export.html" class="menu-item">
+        <span class="icon">📤</span> 数据导出
+      </a>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ===== 主内容区 ===== -->
+  <main class="main-content">
+    <div class="page-header">
+      <h1>📋 合同管理</h1>
+      <div class="breadcrumb">首页 / 合同管理</div>
+    </div>
+
+    <div class="card">
+      <!-- 操作栏 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+        <div class="search-bar" style="margin-bottom: 0;">
+          <select class="form-control" id="filterCategory">
+            <option value="">全部类别</option>
+            <option value="租赁">租赁</option>
+            <option value="知识产权">知识产权</option>
+            <option value="车险">车险</option>
+          </select>
+          <select class="form-control" id="filterStatus">
+            <option value="">全部状态</option>
+            <option value="active">生效中</option>
+            <option value="expiring">即将到期</option>
+            <option value="expired">已到期</option>
+          </select>
+          <input type="text" class="form-control" id="searchKeyword" placeholder="搜索合同名称/公司..." onkeydown="if(event.key==='Enter')renderContracts()">
+          <button class="btn btn-primary btn-sm" onclick="renderContracts()">🔍 搜索</button>
+          <div class="column-toggle-btn" style="position:relative;">
+            <button class="btn btn-outline btn-sm" onclick="toggleColumnPanel()">⚙️ 列显示</button>
+            <div id="columnPanel" class="column-toggle-panel"></div>
+          </div>
+        </div>
+        <span style="display:flex; gap: 2em;">
+          <button class="btn btn-primary" onclick="openSyncModal()">📂 本地文件同步</button>
+          <button class="btn btn-primary" onclick="openContractModal()">＋ 新增合同</button>
+        </span>
+      </div>
+
+      <!-- 批量操作栏 -->
+      <div id="batchBar" style="display:none; margin-bottom:12px; padding:8px 12px; background:var(--primary-light); border-radius:var(--radius-sm); align-items:center; gap:10px; flex-wrap:wrap;">
+        <span style="font-size:13px; color:var(--text-secondary);">已选 <b id="batchCount">0</b> 条</span>
+        <button class="btn btn-outline btn-sm" onclick="batchUpdate('email_reminder', 1)">📧 开启邮件提醒</button>
+        <button class="btn btn-outline btn-sm" onclick="batchUpdate('email_reminder', 0)">🔕 关闭邮件提醒</button>
+        <select class="form-control btn-sm" style="width:auto;" onchange="if(this.value)batchUpdate('priority', this.value); this.value='';">
+          <option value="">批量设置等级...</option>
+          <option value="重要">重要</option>
+          <option value="普通">普通</option>
+          <option value="不重要">不重要</option>
+        </select>
+      </div>
+
+      <!-- 合同列表表格 -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th data-col="select"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" title="全选"></th>
+              <th data-col="id">ID</th>
+              <th data-col="name">合同名称</th>
+              <th data-col="category">类别</th>
+              <th data-col="company">合同公司</th>
+              <th data-col="agent">对接业务员</th>
+              <th data-col="createdAt">创建时间</th>
+              <th data-col="endDate">到期时间</th>
+              <th data-col="status">状态</th>
+              <th data-col="emailReminder">邮件提醒</th>
+              <th data-col="priority">重要等级</th>
+              <th data-col="filePath">本地文件</th>
+              <th data-col="remark">备注</th>
+              <th data-col="actions">操作</th>
+            </tr>
+          </thead>
+          <tbody id="contractTableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- 分页 -->
+      <div class="pagination" id="contractPagination"></div>
+    </div>
+  </main>
+
+  <!-- ===== 新增/编辑合同模态框 ===== -->
+  <div class="modal-backdrop" id="contractModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="contractModalTitle">新增合同</h2>
+        <button class="modal-close" onclick="closeModal('contractModal')">&times;</button>
+      </div>
+      <form onsubmit="saveContract(event)">
+        <input type="hidden" id="contractId">
+        <div class="form-group">
+          <label>合同名称 *</label>
+          <input type="text" class="form-control" id="contractName" required placeholder="请输入合同名称">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>类别 *</label>
+            <select class="form-control" id="contractCategory" required>
+              <option value="">请选择</option>
+              <option value="租赁">租赁</option>
+              <option value="知识产权">知识产权</option>
+              <option value="车险">车险</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>合同公司 *</label>
+            <input type="text" class="form-control" id="contractCompany" required placeholder="请输入合同公司">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>对接业务员 *</label>
+            <input type="text" class="form-control" id="contractAgent" required placeholder="请输入对接业务员">
+          </div>
+          <div class="form-group">
+            <label>联系人</label>
+            <input type="text" class="form-control" id="contractContact" placeholder="请输入联系人（选填）">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>联系人电话</label>
+            <input type="text" class="form-control" id="contractContactPhone" placeholder="请输入联系电话（选填）">
+          </div>
+          <div class="form-group">
+            <label>联系人邮箱</label>
+            <input type="email" class="form-control" id="contractContactEmail" placeholder="请输入联系邮箱（选填）">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>开始日期 *</label>
+            <input type="date" class="form-control" id="contractStartDate" required>
+          </div>
+          <div class="form-group">
+            <label>到期日期 *</label>
+            <input type="date" class="form-control" id="contractEndDate" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>附件上传</label>
+          <input type="file" class="form-control" id="contractFile" style="padding:5px;">
+          <input type="hidden" id="contractFilePath">
+          <small style="color:var(--text-muted);">选择文件后自动上传，或留空跳过</small>
+        </div>
+        <div class="form-group">
+          <label>备注</label>
+          <textarea class="form-control" id="contractRemark" placeholder="备注信息（选填）"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="contractEmailReminder" checked> 邮件提醒
+            </label>
+          </div>
+          <div class="form-group">
+            <label>重要等级</label>
+            <select class="form-control" id="contractPriority">
+              <option value="重要">重要</option>
+              <option value="普通" selected>普通</option>
+              <option value="不重要">不重要</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('contractModal')">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== 查看详情模态框 ===== -->
+  <div class="modal-backdrop" id="detailModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>合同详情</h2>
+        <button class="modal-close" onclick="closeModal('detailModal')">&times;</button>
+      </div>
+      <div id="detailContent"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('detailModal')">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 本地文件同步模态框 ===== -->
+  <div class="modal-backdrop" id="syncModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>📂 本地文件同步</h2>
+        <button class="modal-close" onclick="closeModal('syncModal')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>本地目录路径</label>
+        <input type="text" class="form-control" id="syncDirectory" placeholder="例如: D:\合同文件">
+        <small style="color:var(--text-muted);">输入包含合同文件的文件夹路径，点击"扫描"查看可导入的文件</small>
+      </div>
+      <div id="syncResult" style="max-height:300px; overflow-y:auto; margin:12px 0;"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('syncModal')">关闭</button>
+        <button type="button" class="btn btn-primary" id="syncScanBtn" onclick="scanDirectory()">🔍 扫描文件</button>
+        <button type="button" class="btn btn-primary" id="syncImportBtn" onclick="importFiles()" style="display:none;">📥 一键导入</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/app.js"></script>
+  <script>
+    let currentPage = 1;
+    const pageSize = 8;
+
+    async function loadContracts(params = {}) {
+      params.page = params.page || currentPage;
+      params.pageSize = params.pageSize || pageSize;
+      if (document.getElementById('filterCategory').value) params.category = document.getElementById('filterCategory').value;
+      if (document.getElementById('filterStatus').value) params.status = document.getElementById('filterStatus').value;
+      if (document.getElementById('searchKeyword').value) params.keyword = document.getElementById('searchKeyword').value;
+      try { const res = await API.get('/contracts', params); return res.data; }
+      catch (err) { showToast('加载失败: ' + err.message, 'error'); return { items: [], total: 0 }; }
+    }
+
+    function renderContracts() { currentPage = 1; renderTable(); }
+
+    async function renderTable() {
+      const data = await loadContracts();
+      const tbody = document.getElementById('contractTableBody');
+      document.getElementById('selectAll').checked = false;
+      updateBatchBar();
+
+      if (data.items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${getVisibleCount()}" style="text-align:center; padding:40px; color:var(--text-muted);">暂无数据</td></tr>`;
+      } else {
+        tbody.innerHTML = data.items.map(c => `
+          <tr>
+            <td data-col="select"><input type="checkbox" class="rowCheck" value="${c.id}" onchange="updateBatchBar()"></td>
+            <td data-col="id">${c.id}</td>
+            <td data-col="name"><a href="javascript:viewContract(${c.id})">${c.name}</a></td>
+            <td data-col="category">${c.category}</td>
+            <td data-col="company">${c.company}</td>
+            <td data-col="agent">${c.agent}</td>
+            <td data-col="createdAt">${c.createdAt || c.createTime}</td>
+            <td data-col="endDate">${c.endDate || c.expireTime}</td>
+            <td data-col="status">${getStatusBadge(c.status)}</td>
+            <td data-col="emailReminder"><input type="checkbox" ${c.emailReminder !== false ? 'checked' : ''} onchange="toggleReminder('contracts', ${c.id}, this.checked)" title="邮件提醒"></td>
+            <td data-col="priority">${getPriorityBadge(c.priority)}</td>
+            <td data-col="filePath"><a href="javascript:void(0)" onclick="showToast('文件: ${c.filePath || '(无)'}', 'info')">📎 查看</a></td>
+            <td data-col="remark">${c.remark || '-'}</td>
+            <td data-col="actions">
+              <button class="btn btn-outline btn-sm" onclick="editContract(${c.id})">编辑</button>
+              <button class="btn btn-danger btn-sm admin-only" onclick="deleteContract(${c.id}, '${c.name.replace(/'/g, "\\'")}')">删除</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      applyColumnVisibility();
+
+      // 分页
+      const totalPages = Math.ceil(data.total / pageSize);
+      const pag = document.getElementById('contractPagination');
+      if (totalPages <= 1) {
+        pag.innerHTML = '';
+      } else {
+        let html = `<button class="page-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>&laquo;</button>`;
+        for (let i = 1; i <= totalPages; i++) {
+          html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+        }
+        html += `<button class="page-btn" onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>&raquo;</button>`;
+        pag.innerHTML = html;
+      }
+    }
+
+    function goPage(p) { currentPage = p; renderTable(); }
+
+    function openContractModal() {
+      document.getElementById('contractModalTitle').textContent = '新增合同';
+      const today = new Date().toISOString().substring(0, 10);
+      document.getElementById('contractId').value = '';
+      document.getElementById('contractName').value = '';
+      document.getElementById('contractCategory').value = '';
+      document.getElementById('contractCompany').value = '';
+      document.getElementById('contractAgent').value = '';
+      document.getElementById('contractContact').value = '';
+      document.getElementById('contractContactPhone').value = '';
+      document.getElementById('contractContactEmail').value = '';
+      document.getElementById('contractStartDate').value = today;
+      document.getElementById('contractEndDate').value = '';
+      document.getElementById('contractFilePath').value = '';
+      document.getElementById('contractFile').value = '';
+      document.getElementById('contractRemark').value = '';
+      document.getElementById('contractEmailReminder').checked = true;
+      document.getElementById('contractPriority').value = '普通';
+      openModal('contractModal');
+    }
+
+    // Auto-upload file when selected
+    document.getElementById('contractFile').addEventListener('change', async function() {
+      const file = this.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', document.getElementById('contractCategory').value || '合同');
+      try {
+        const res = await API.upload('/files/upload', formData);
+        document.getElementById('contractFilePath').value = res.data.storedPath;
+        showToast('文件已上传', 'success');
+      } catch (err) {
+        showToast('文件上传失败: ' + err.message, 'error');
+        this.value = '';
+      }
+    });
+
+    function editContract(id) {
+      API.get('/contracts/' + id).then(res => {
+        const c = res.data;
+        document.getElementById('contractModalTitle').textContent = '编辑合同';
+        document.getElementById('contractId').value = c.id;
+        document.getElementById('contractName').value = c.name;
+        document.getElementById('contractCategory').value = c.category;
+        document.getElementById('contractCompany').value = c.company;
+        document.getElementById('contractAgent').value = c.agent;
+        document.getElementById('contractContact').value = c.contactPerson || '';
+        document.getElementById('contractContactPhone').value = c.contactPhone || '';
+        document.getElementById('contractContactEmail').value = c.contactEmail || '';
+        document.getElementById('contractStartDate').value = c.startDate;
+        document.getElementById('contractEndDate').value = c.endDate;
+        document.getElementById('contractFilePath').value = c.filePath || '';
+        document.getElementById('contractRemark').value = c.remark || '';
+        document.getElementById('contractEmailReminder').checked = c.emailReminder !== false;
+        document.getElementById('contractPriority').value = c.priority || '普通';
+        openModal('contractModal');
+      }).catch(err => showToast('获取合同失败: ' + err.message, 'error'));
+    }
+
+    async function saveContract(e) {
+      e.preventDefault();
+      const id = document.getElementById('contractId').value;
+      const body = {
+        name: document.getElementById('contractName').value,
+        category: document.getElementById('contractCategory').value,
+        company: document.getElementById('contractCompany').value,
+        contactPerson: document.getElementById('contractContact').value,
+        contactPhone: document.getElementById('contractContactPhone').value,
+        contactEmail: document.getElementById('contractContactEmail').value,
+        agent: document.getElementById('contractAgent').value,
+        startDate: document.getElementById('contractStartDate').value,
+        endDate: document.getElementById('contractEndDate').value,
+        filePath: document.getElementById('contractFilePath').value,
+        remark: document.getElementById('contractRemark').value,
+        emailReminder: document.getElementById('contractEmailReminder').checked,
+        priority: document.getElementById('contractPriority').value,
+      };
+
+      try {
+        if (id) {
+          await API.put('/contracts/' + id, body);
+          showToast('合同已更新', 'success');
+        } else {
+          await API.post('/contracts', body);
+          showToast('合同已添加', 'success');
+        }
+        closeModal('contractModal');
+        renderTable();
+      } catch (err) {
+        showToast('保存失败: ' + err.message, 'error');
+      }
+    }
+
+    async function deleteContract(id, name) {
+      if (!confirm('确定删除合同「' + name + '」吗？')) return;
+      try { await API.del('/contracts/' + id); showToast('合同已删除', 'success'); renderTable(); }
+      catch (err) { showToast('删除失败: ' + err.message, 'error'); }
+    }
+
+    async function viewContract(id) {
+      try {
+        const res = await API.get('/contracts/' + id);
+        const c = res.data;
+        document.getElementById('detailContent').innerHTML = `
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; font-size:13px;">
+            <div><strong>合同名称：</strong>${c.name}</div>
+            <div><strong>类别：</strong>${c.category}</div>
+            <div><strong>合同公司：</strong>${c.company}</div>
+            <div><strong>联系人：</strong>${c.contactPerson || '-'}</div>
+            <div><strong>联系人电话：</strong>${c.contactPhone || '-'}</div>
+            <div><strong>对接业务员：</strong>${c.agent}</div>
+            <div><strong>联系人邮箱：</strong>${c.contactEmail || '-'}</div>
+            <div><strong>开始日期：</strong>${c.startDate}</div>
+            <div><strong>到期日期：</strong>${c.endDate}</div>
+            <div><strong>状态：</strong>${getStatusBadge(c.status)}</div>
+            <div><strong>创建时间：</strong>${c.createdAt}</div>
+            <div><strong>文件路径：</strong>${c.filePath || '无'}</div>
+            <div style="grid-column: 1/-1;"><strong>备注：</strong>${c.remark || '无'}</div>
+          </div>
+        `;
+        openModal('detailModal');
+      } catch (err) { showToast('加载详情失败: ' + err.message, 'error'); }
+    }
+
+    // ---- 本地文件同步 ----
+    let syncNewFiles = [];
+
+    function openSyncModal() {
+      document.getElementById('syncDirectory').value = '';
+      document.getElementById('syncResult').innerHTML = '';
+      document.getElementById('syncImportBtn').style.display = 'none';
+      syncNewFiles = [];
+      openModal('syncModal');
+    }
+
+    async function scanDirectory() {
+      const dir = document.getElementById('syncDirectory').value.trim();
+      if (!dir) { showToast('请输入目录路径', 'error'); return; }
+      const btn = document.getElementById('syncScanBtn');
+      btn.disabled = true; btn.textContent = '扫描中...';
+      try {
+        const res = await API.post('/scan', { directory: dir, module: 'contract' });
+        const d = res.data;
+        syncNewFiles = d.newFiles;
+        let html = `<div style="margin-bottom:8px; color:var(--text-muted);">
+          共 ${d.total} 个文件，其中 <b style="color:var(--success);">${d.newCount}</b> 个待导入，<b>${d.existingCount}</b> 个已存在</div>`;
+        if (d.newFiles.length > 0) {
+          html += '<table><thead><tr><th>文件名</th><th>大小</th></tr></thead><tbody>';
+          d.newFiles.forEach(f => {
+            html += `<tr><td>📄 ${f.name}</td><td>${(f.size / 1024).toFixed(1)} KB</td></tr>`;
+          });
+          html += '</tbody></table>';
+          document.getElementById('syncImportBtn').style.display = '';
+        } else if (d.total === 0) {
+          html += '<p style="color:var(--text-muted);">目录为空，未找到支持的文件</p>';
+        } else {
+          html += '<p style="color:var(--text-muted);">所有文件已同步，无需导入</p>';
+        }
+        document.getElementById('syncResult').innerHTML = html;
+      } catch (err) { showToast('扫描失败: ' + err.message, 'error'); }
+      finally { btn.disabled = false; btn.textContent = '🔍 扫描文件'; }
+    }
+
+    async function importFiles() {
+      if (syncNewFiles.length === 0) { showToast('没有可导入的文件', 'error'); return; }
+      const cat = document.getElementById('filterCategory').value || '';
+      const btn = document.getElementById('syncImportBtn');
+      btn.disabled = true; btn.textContent = '导入中...';
+      try {
+        const res = await API.post('/scan/import', {
+          module: 'contract',
+          files: syncNewFiles,
+          category: cat || '未分类'
+        });
+        showToast(res.message, 'success');
+        closeModal('syncModal');
+        renderTable();
+      } catch (err) { showToast('导入失败: ' + err.message, 'error'); }
+      finally { btn.disabled = false; btn.textContent = '📥 一键导入'; }
+    }
+
+    // ---- 批量操作 & 邮件提醒 ----
+    function toggleSelectAll() {
+      const checked = document.getElementById('selectAll').checked;
+      document.querySelectorAll('.rowCheck').forEach(cb => cb.checked = checked);
+      updateBatchBar();
+    }
+
+    function updateBatchBar() {
+      const checked = document.querySelectorAll('.rowCheck:checked');
+      const count = checked.length;
+      document.getElementById('batchCount').textContent = count;
+      document.getElementById('batchBar').style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    function getCheckedIds() {
+      return Array.from(document.querySelectorAll('.rowCheck:checked')).map(cb => parseInt(cb.value));
+    }
+
+    async function toggleReminder(table, id, checked) {
+      try {
+        await API.put(`/${table}/batch`, { ids: [id], field: 'email_reminder', value: checked ? 1 : 0 });
+        showToast(checked ? '邮件提醒已开启' : '邮件提醒已关闭', 'success');
+      } catch (err) { showToast('操作失败: ' + err.message, 'error'); renderTable(); }
+    }
+
+    async function batchUpdate(field, value) {
+      const ids = getCheckedIds();
+      if (ids.length === 0) { showToast('请先选择记录', 'error'); return; }
+      try {
+        await API.put('/contracts/batch', { ids, field, value });
+        const labelMap = { email_reminder: value == 1 ? '开启邮件提醒' : '关闭邮件提醒', priority: '设置等级为' + value };
+        showToast(`已批量${labelMap[field] || '更新'} ${ids.length} 条`, 'success');
+        renderTable();
+      } catch (err) { showToast('批量操作失败: ' + err.message, 'error'); }
+    }
+
+    function getPriorityBadge(priority) {
+      const p = priority || '普通';
+      const colorMap = { '重要': 'var(--danger)', '普通': 'var(--text-muted)', '不重要': 'var(--success)' };
+      const bgMap = { '重要': '#fff2f0', '普通': '#fafafa', '不重要': '#f6ffed' };
+      const borderMap = { '重要': '#ffccc7', '普通': '#d9d9d9', '不重要': '#b7eb8f' };
+      return `<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500;color:${colorMap[p]};background:${bgMap[p]};border:1px solid ${borderMap[p]};">${p}</span>`;
+    }
+
+    // ---- 列显示配置 ----
+    const COLUMN_CONFIG = [
+      { key: 'id', label: 'ID', defaultVisible: false },
+      { key: 'name', label: '合同名称', defaultVisible: true },
+      { key: 'category', label: '类别', defaultVisible: true },
+      { key: 'company', label: '合同公司', defaultVisible: true },
+      { key: 'agent', label: '对接业务员', defaultVisible: true },
+      { key: 'createdAt', label: '创建时间', defaultVisible: false },
+      { key: 'endDate', label: '到期时间', defaultVisible: true },
+      { key: 'status', label: '状态', defaultVisible: true },
+      { key: 'emailReminder', label: '邮件提醒', defaultVisible: false },
+      { key: 'priority', label: '重要等级', defaultVisible: false },
+      { key: 'filePath', label: '本地文件', defaultVisible: false },
+      { key: 'remark', label: '备注', defaultVisible: true },
+    ];
+
+    function loadColumnConfig() {
+      try {
+        const saved = localStorage.getItem('contractColumns');
+        if (saved) return JSON.parse(saved);
+      } catch (e) { /* ignore */ }
+      const cfg = {};
+      COLUMN_CONFIG.forEach(c => cfg[c.key] = c.defaultVisible);
+      return cfg;
+    }
+
+    function saveColumnConfig(cfg) {
+      localStorage.setItem('contractColumns', JSON.stringify(cfg));
+    }
+
+    function applyColumnVisibility() {
+      const cfg = loadColumnConfig();
+      document.querySelectorAll('#contractTableBody td[data-col], thead th[data-col]').forEach(el => {
+        const col = el.getAttribute('data-col');
+        if (col === 'select' || col === 'actions') return;
+        if (cfg[col]) {
+          el.classList.remove('col-hidden');
+        } else {
+          el.classList.add('col-hidden');
+        }
+      });
+    }
+
+    function getVisibleCount() {
+      const cfg = loadColumnConfig();
+      let count = 2; // select + actions always visible
+      COLUMN_CONFIG.forEach(c => { if (cfg[c.key]) count++; });
+      return count;
+    }
+
+    function toggleColumnPanel() {
+      const panel = document.getElementById('columnPanel');
+      const isOpen = panel.classList.contains('show');
+      if (isOpen) {
+        panel.classList.remove('show');
+      } else {
+        renderColumnPanel();
+        panel.classList.add('show');
+      }
+    }
+
+    function renderColumnPanel() {
+      const cfg = loadColumnConfig();
+      const panel = document.getElementById('columnPanel');
+      panel.innerHTML = COLUMN_CONFIG.map(c => `
+        <label>
+          <input type="checkbox" ${cfg[c.key] ? 'checked' : ''} onchange="onColumnToggle('${c.key}', this.checked)">
+          ${c.label}
+        </label>
+      `).join('');
+    }
+
+    function onColumnToggle(key, checked) {
+      const cfg = loadColumnConfig();
+      cfg[key] = checked;
+      saveColumnConfig(cfg);
+      applyColumnVisibility();
+    }
+
+    // Close panel on outside click
+    document.addEventListener('click', function(e) {
+      const panel = document.getElementById('columnPanel');
+      if (!panel) return;
+      const btn = e.target.closest('.column-toggle-btn');
+      if (!btn && panel.classList.contains('show')) {
+        panel.classList.remove('show');
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', renderTable);
+  </script>
+</body>
+</html>

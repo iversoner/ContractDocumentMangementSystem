@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统配置 - 素珍管理系统</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="logo" style="display: flex; align-items: center; gap: 10px;">
+      <button class="menu-toggle" id="menuToggle" title="菜单">&#9776;</button>
+      <span>🌐 素珍管理系统</span>
+    </div>
+    <div class="nav-links">
+      <a href="dashboard.html">仪表盘</a>
+      <a href="contract.html">合同管理</a>
+      <a href="patent.html">专利管理</a>
+      <a href="insurance.html">车险续期</a>
+      <a href="files.html">文件管理</a>
+      <a href="users.html" class="admin-only">用户管理</a>
+      <a href="settings.html" class="active">系统配置</a>
+      <a href="logs.html">系统日志</a>
+      <a href="export.html">数据导出</a>
+    </div>
+    <div class="nav-user">
+      <span style="font-size:13px;" id="navUserName">管理员</span>
+      <span class="avatar" id="navUserAvatar">管</span>
+      <a href="javascript:handleLogout()" class="btn btn-outline btn-sm">退出</a>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="menu-group">
+      <div class="menu-group-title">主菜单</div>
+      <a href="dashboard.html" class="menu-item"><span class="icon">📊</span> 仪表盘</a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">业务管理</div>
+      <a href="contract.html" class="menu-item"><span class="icon">📋</span> 合同管理</a>
+      <a href="patent.html" class="menu-item"><span class="icon">💡</span> 专利管理</a>
+      <a href="insurance.html" class="menu-item"><span class="icon">🚗</span> 车险续期</a>
+      <a href="files.html" class="menu-item"><span class="icon">📁</span> 文件管理</a>
+    </div>
+    <div class="menu-group">
+      <div class="menu-group-title">系统管理</div>
+      <a href="users.html" class="menu-item admin-only"><span class="icon">👥</span> 用户管理</a>
+      <a href="settings.html" class="menu-item active"><span class="icon">⚙️</span> 系统配置</a>
+      <a href="logs.html" class="menu-item"><span class="icon">📜</span> 系统日志</a>
+      <a href="export.html" class="menu-item"><span class="icon">📤</span> 数据导出</a>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>⚙️ 系统配置</h1>
+      <div class="breadcrumb">首页 / 系统配置</div>
+    </div>
+
+    <!-- 邮箱配置 -->
+    <div class="card">
+      <div class="card-header">
+        <h3>📧 邮箱服务配置
+          <span class="help-tip">?
+            <span class="help-tip-text">系统通过 SMTP 协议发送邮件通知。
+发件人即「发送账号」填的邮箱地址。
+• 163邮箱: smtp.163.com 端口465/587
+• QQ邮箱: smtp.qq.com 端口465/587
+发送密码需要去邮箱设置里获取【授权码】，不是登录密码。</span>
+          </span>
+        </h3>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-primary btn-sm admin-only" onclick="saveSettings()">💾 保存配置</button>
+          <button class="btn btn-outline btn-sm admin-only" onclick="testEmailSend()">测试发送</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>SMTP 服务器
+            <span class="help-tip">?
+              <span class="help-tip-text">邮件发送服务器的地址。
+163邮箱: smtp.163.com
+QQ邮箱: smtp.qq.com</span>
+            </span>
+          </label>
+          <input type="text" class="form-control" id="smtpServer" value="smtp.example.com">
+        </div>
+        <div class="form-group">
+          <label>SMTP 端口
+            <span class="help-tip">?
+              <span class="help-tip-text">163邮箱: 465 或 587
+QQ邮箱: 465 或 587
+勾选TLS用587，不勾选用465</span>
+            </span>
+          </label>
+          <input type="number" class="form-control" id="smtpPort" value="587">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>发送账号</label>
+          <input type="email" class="form-control" id="smtpUser" value="notify@suzhen.com">
+        </div>
+        <div class="form-group">
+          <label>发送密码
+            <span class="help-tip">?
+              <span class="help-tip-text">不是邮箱登录密码！
+需要去邮箱网页版设置里开启SMTP服务，获取【授权码】填入这里。</span>
+            </span>
+          </label>
+          <div style="display:flex; gap:4px;">
+            <input type="password" class="form-control" id="smtpPass" value="" style="flex:1;" placeholder="留空则不修改密码">
+            <button type="button" class="btn btn-outline btn-sm" id="togglePwdBtn" onclick="togglePassword()" style="padding:4px 8px;">👁</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>发件人名称</label>
+          <input type="text" class="form-control" id="senderName" value="素珍管理系统">
+        </div>
+        <div class="form-group" style="display: flex; align-items: flex-end;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="useTLS" checked> 使用 TLS 加密
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 到期提醒配置 -->
+    <div class="card">
+      <div class="card-header">
+        <h3>⏰ 到期提醒配置</h3>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>提前天数提醒</label>
+          <input type="number" class="form-control" id="daysBefore" value="30" min="1" max="90">
+        </div>
+        <div class="form-group">
+          <label>每日发送时间</label>
+          <input type="time" class="form-control" id="sendTime" value="09:00">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>提醒接收邮箱</label>
+          <input type="text" class="form-control" id="remindRecipients" value="admin@suzhen.com" placeholder="多个邮箱用逗号分隔">
+        </div>
+        <div class="form-group" style="display: flex; align-items: flex-end;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="remindEnabled" checked> 启用到期提醒
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 存储配置 -->
+    <div class="card">
+      <div class="card-header">
+        <h3>💾 文件存储配置</h3>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>上传文件夹路径</label>
+          <input type="text" class="form-control" id="uploadFolder" value="/data/uploads">
+        </div>
+        <div class="form-group">
+          <label>最大文件大小 (MB)</label>
+          <input type="number" class="form-control" id="maxFileSize" value="10" min="1" max="100">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>允许的文件类型</label>
+        <input type="text" class="form-control" id="allowedTypes" value=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png">
+      </div>
+    </div>
+
+    <!-- 数据库配置 -->
+    <div class="card">
+      <div class="card-header">
+        <h3>🗄️ 数据库配置</h3>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>数据库类型</label>
+          <input type="text" class="form-control" value="SQLite3" disabled>
+        </div>
+        <div class="form-group">
+          <label>数据库路径</label>
+          <input type="text" class="form-control" id="dbPath" value="/data/suzhen.db">
+        </div>
+      </div>
+      <div class="form-row" style="align-items: flex-end;">
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="backupEnabled" checked> 启用自动备份
+          </label>
+        </div>
+        <div class="form-group">
+          <label>备份频率</label>
+          <select class="form-control" id="backupInterval">
+            <option value="daily" selected>每天</option>
+            <option value="weekly">每周</option>
+            <option value="monthly">每月</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 保存按钮 -->
+    <div style="text-align: right; margin-top: 16px;">
+      <button class="btn btn-primary" onclick="saveSettings()" style="padding: 10px 40px;">💾 保存所有配置</button>
+    </div>
+  </main>
+
+  <script src="../js/app.js"></script>
+  <script>
+    let dirty = false;
+
+    function togglePassword() {
+      const el = document.getElementById('smtpPass');
+      const btn = document.getElementById('togglePwdBtn');
+      if (el.type === 'password') {
+        el.type = 'text';
+        btn.innerHTML = '&#x1F441;';
+      } else {
+        el.type = 'password';
+        btn.innerHTML = '<span style="position:relative;display:inline-block;">&#x1F441;<span style="position:absolute;left:-2px;top:50%;width:120%;height:2px;background:#999;transform:rotate(-45deg);margin-top:-1px;"></span></span>';
+      }
+    }
+
+    async function testEmailSend() {
+      const testEmail = prompt('输入测试接收邮箱:', document.getElementById('remindRecipients').value || document.getElementById('smtpUser').value);
+      if (!testEmail) return;
+      const body = {
+        email: testEmail,
+        smtpConfig: {
+          smtpServer: document.getElementById('smtpServer').value,
+          smtpPort: parseInt(document.getElementById('smtpPort').value) || 587,
+          username: document.getElementById('smtpUser').value,
+          password: document.getElementById('smtpPass').value,
+          useTLS: document.getElementById('useTLS').checked,
+          senderName: document.getElementById('senderName').value,
+        }
+      };
+      try { const res = await API.post('/settings/test-email', body); alert(res.message); }
+      catch (err) { alert('测试失败: ' + err.message); }
+    }
+
+    async function saveSettings() {
+      const body = {
+        email: {
+          smtpServer: document.getElementById('smtpServer').value,
+          smtpPort: parseInt(document.getElementById('smtpPort').value) || 587,
+          username: document.getElementById('smtpUser').value,
+          password: document.getElementById('smtpPass').value,
+          useTLS: document.getElementById('useTLS').checked,
+          senderName: document.getElementById('senderName').value,
+        },
+        database: {
+          path: document.getElementById('dbPath').value,
+          backupEnabled: document.getElementById('backupEnabled').checked,
+          backupInterval: document.getElementById('backupInterval').value,
+        },
+        storage: {
+          uploadFolder: document.getElementById('uploadFolder').value,
+          maxFileSize: parseInt(document.getElementById('maxFileSize').value) * 1024 * 1024 || 10485760,
+          allowedTypes: document.getElementById('allowedTypes').value,
+        },
+        reminder: {
+          enabled: document.getElementById('remindEnabled').checked,
+          daysBefore: parseInt(document.getElementById('daysBefore').value) || 30,
+          sendTime: document.getElementById('sendTime').value,
+          recipients: document.getElementById('remindRecipients').value,
+        },
+      };
+      try { await API.put('/settings', body); alert('配置已保存'); dirty = false; }
+      catch (err) { alert('保存失败: ' + err.message); }
+    }
+
+    // 监听表单变化
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('input, select').forEach(el => {
+        el.addEventListener('change', () => { dirty = true; });
+        el.addEventListener('input', () => { dirty = true; });
+      });
+    });
+
+    // 未保存离开提示
+    window.addEventListener('beforeunload', (e) => {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = '你有未保存的配置改动，确定离开吗？';
+        return e.returnValue;
+      }
+    });
+
+    // 加载配置
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const res = await API.get('/settings');
+        const s = res.data;
+        document.getElementById('smtpServer').value = s.email.smtpServer || '';
+        document.getElementById('smtpPort').value = s.email.smtpPort || 587;
+        document.getElementById('smtpUser').value = s.email.username || '';
+        document.getElementById('smtpPass').value = s.email.password || '';
+        document.getElementById('senderName').value = s.email.senderName || '';
+        document.getElementById('useTLS').checked = s.email.useTLS !== false;
+        document.getElementById('dbPath').value = s.database.path || '';
+        document.getElementById('backupEnabled').checked = s.database.backupEnabled || false;
+        document.getElementById('backupInterval').value = s.database.backupInterval || 'daily';
+        document.getElementById('uploadFolder').value = s.storage.uploadFolder || '';
+        document.getElementById('maxFileSize').value = (s.storage.maxFileSize || 10485760) / (1024 * 1024);
+        document.getElementById('allowedTypes').value = s.storage.allowedTypes || '';
+        document.getElementById('daysBefore').value = s.reminder.daysBefore || 30;
+        document.getElementById('sendTime').value = s.reminder.sendTime || '09:00';
+        document.getElementById('remindRecipients').value = s.reminder.recipients || '';
+        document.getElementById('remindEnabled').checked = s.reminder.enabled !== false;
+        dirty = false;
+        // 非管理员：禁用所有表单字段（只读）
+        if (!isAdmin()) {
+          document.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
+        }
+      } catch (err) { /* ignore */ }
+    });
+  </script>
+</body>
+</html>
