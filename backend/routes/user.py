@@ -4,6 +4,7 @@
 from flask import Blueprint, request, jsonify, g
 
 from database.db import get_db
+from database.db import utc_to_beijing
 from services.auth_service import hash_password
 from services.log_service import write_log
 from middleware.auth_middleware import login_required, admin_required
@@ -19,7 +20,7 @@ def _row_to_dict(r) -> dict:
         'email': r['email'] or '',
         'role': r['role'],
         'status': r['status'],
-        'createdAt': str(r['created_at']),
+        'createdAt': utc_to_beijing(str(r['created_at'])),
     }
 
 
@@ -108,7 +109,7 @@ def update_user(id):
 
     data = request.get_json() or {}
     db.execute(
-        "UPDATE users SET display_name=?, email=?, role=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+        "UPDATE users SET display_name=?, email=?, role=?, status=?, updated_at=beijing_now() WHERE id=?",
         (data.get('displayName', old['display_name']),
          data.get('email', old['email'] or ''),
          data.get('role', old['role']),
@@ -134,7 +135,7 @@ def reset_password(id):
     data = request.get_json() or {}
     new_password = data.get('password', '123456')
     password_hash = hash_password(new_password)
-    db.execute("UPDATE users SET password_hash=?, updated_at=CURRENT_TIMESTAMP WHERE id=?", (password_hash, id))
+    db.execute("UPDATE users SET password_hash=?, updated_at=beijing_now() WHERE id=?", (password_hash, id))
     db.commit()
     write_log(action='重置密码', module='用户管理',
               detail=f'重置用户「{old["display_name"]}」({old["username"]})的密码',

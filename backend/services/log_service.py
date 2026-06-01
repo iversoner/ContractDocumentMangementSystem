@@ -4,6 +4,7 @@
 """
 from flask import request, g
 from database.db import get_db
+from database.db import beijing_now
 
 
 def write_log(action: str, module: str, level: str = 'info', detail: str = '', user_id: int = None, username: str = None):
@@ -16,7 +17,7 @@ def write_log(action: str, module: str, level: str = 'info', detail: str = '', u
     ip_address = request.remote_addr if request else ''
 
     db.execute(
-        "INSERT INTO operation_logs (user_id, username, action, module, level, detail, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO operation_logs (user_id, username, action, module, level, detail, ip_address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, beijing_now())",
         (user_id, username, action, module, level, detail, ip_address)
     )
     db.commit()

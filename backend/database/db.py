@@ -4,8 +4,31 @@
 """
 import sqlite3
 import os
+from datetime import datetime, timezone, timedelta
 
 from flask import g, current_app
+
+
+def beijing_now():
+    """返回北京时间字符串 (UTC+8)"""
+    return datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
+
+
+def utc_to_beijing(utc_str):
+    """将 UTC 时间字符串转为北京时间字符串"""
+    if not utc_str:
+        return utc_str
+    try:
+        for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d']:
+            try:
+                dt = datetime.strptime(utc_str, fmt)
+                dt = dt.replace(tzinfo=timezone.utc) + timedelta(hours=8)
+                return dt.strftime('%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                continue
+        return utc_str
+    except Exception:
+        return utc_str
 
 
 def get_db_path():
@@ -26,6 +49,8 @@ def get_db():
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA journal_mode=WAL")
         g.db.execute("PRAGMA foreign_keys=ON")
+        # 注册北京时间 SQLite 函数
+        g.db.create_function('beijing_now', 0, beijing_now)
     return g.db
 
 

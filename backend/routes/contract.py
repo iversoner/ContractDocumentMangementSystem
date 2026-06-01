@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from flask import Blueprint, request, jsonify, g
 
 from database.db import get_db
+from database.db import utc_to_beijing
 from services.log_service import write_log
 from middleware.auth_middleware import login_required, admin_required
 
@@ -41,8 +42,8 @@ def _row_to_dict(r) -> dict:
         'status': r['status'],
         'filePath': r['file_path'] or '',
         'remark': r['remark'] or '',
-        'createdAt': str(r['created_at']),
-        'updatedAt': str(r['updated_at']),
+        'createdAt': utc_to_beijing(str(r['created_at'])),
+        'updatedAt': utc_to_beijing(str(r['updated_at'])),
         'source': r['source'] if 'source' in r.keys() else 'manual',
         'emailReminder': bool(r['email_reminder']) if 'email_reminder' in r.keys() else True,
         'priority': r['priority'] if 'priority' in r.keys() else '普通',
@@ -150,7 +151,7 @@ def update_contract(id):
     db.execute(
         """UPDATE contracts SET name=?, category=?, company=?, contact_person=?, contact_phone=?,
            contact_email=?, agent=?, start_date=?, end_date=?, status=?, file_path=?, remark=?,
-           email_reminder=?, priority=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+           email_reminder=?, priority=?, updated_at=beijing_now() WHERE id=?""",
         (data.get('name', old['name']),
          data.get('category', old['category']),
          data.get('company', old['company']),
@@ -192,7 +193,7 @@ def batch_update_contracts():
 
     db = get_db()
     for cid in ids:
-        db.execute(f"UPDATE contracts SET {field}=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+        db.execute(f"UPDATE contracts SET {field}=?, updated_at=beijing_now() WHERE id=?",
                    (value, cid))
     db.commit()
 
