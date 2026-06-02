@@ -83,13 +83,18 @@
 
 ### 10. 数据导出
 - 三种导出方式：导出所有数据 / 按创建时间范围导出 / 按到期时间范围导出
-- 支持 JSON 和 CSV 格式
+- 支持 JSON 和 Excel (.xlsx) 两种格式
+- Excel 导出使用 openpyxl 生成多 Sheet 工作簿（合同数据 / 专利数据 / 车险数据），表头蓝底白字加粗，自动列宽
+- 导出文件保存到 `/data/exports/`（Docker）或 `backend/exports/`（本地开发），文件名包含北京时间戳
+- 前端显示导出文件路径，便于用户定位
 
 ### 11. 目录扫描 & 批量导入
 - 扫描指定目录下的文件，识别哪些文件尚未录入系统
 - 支持合同、专利、车险三种模块
 - 一键批量导入未录入的文件
 - 文件路径去重，避免重复录入
+- Docker 环境下通过 📂 文件夹选择器自动识别容器内路径：用户选择挂载目录下的文件夹 → 前端从 `webkitRelativePath` 提取文件夹名 → 自动构造 `/data/文件夹名` 路径 → 自动触发扫描
+- 目录不存在时给出友好容错提示，引导用户将文件放入正确的挂载目录
 
 ---
 
@@ -99,7 +104,7 @@
 |------|----------|
 | 后端 | Python 3.11+ / Flask 3.x |
 | 前端 | HTML5 / CSS3 / Vanilla JavaScript |
-| 数据库 | SQLite3 (WAL模式) |
+| 数据库 | SQLite3 (WAL模式)，自定义 `beijing_now()` 函数写入北京时间 |
 | 文件存储 | 本地文件夹 |
 | 邮件服务 | SMTP |
 | 容器化 | Docker + Docker Compose |
@@ -142,6 +147,9 @@
 8. **批量操作**：合同/专利/车险页面支持全选、批量设置邮件提醒开关、批量设置重要等级
 9. **可配置列显示**：合同/专利/车险页面通过"⚙️ 列显示"按钮勾选要显示的列，配置保存到 localStorage 持久化
 10. **权限控制**：系统管理员拥有所有权限；业务员/财务不拥有删除权限、系统配置修改权限、用户管理权限；业务员/财务只能看到同角色用户和自己的日志
+11. **时区统一**：SQLite 的 `CURRENT_TIMESTAMP` 返回 UTC 时间，系统通过自定义 SQLite 函数 `beijing_now()` 确保所有时间写入均为北京时间 (UTC+8)
+12. **环境识别**：前端通过 `API_BASE === '/api'` 判断是否运行在 Docker 环境，用于同步模态框路径提示切换、IP 获取等场景
+13. **IP 获取优先级**：安装脚本获取本机 IP 时优先匹配 WLAN 无线网卡，排除 VMware/VirtualBox 虚拟网卡，避免拿到不可用的 IP
 
 ---
 
@@ -158,7 +166,7 @@
 | 用户 | `GET/POST /api/users` `PUT /api/users/<id>` `PUT /api/users/<id>/reset-password` `DELETE /api/users/<id>` | POST/PUT/DELETE需管理员 |
 | 日志 | `GET /api/logs` `DELETE /api/logs` | 需登录 |
 | 配置 | `GET/PUT /api/settings` `POST /api/settings/test-email` | PUT/POST需管理员 |
-| 导出 | `POST /api/export` | 需登录 |
+| 导出 | `POST /api/export` (type: all/byCreate/byExpire, format: json/xlsx) | 需登录 |
 | 扫描 | `POST /api/scan` `POST /api/scan/import` | 需登录 |
 
 ---

@@ -1,13 +1,13 @@
 # ============================================================
-#  素珍管理系统 - Dockerfile
-#  基于 nginx:alpine 托管前端静态页面
+#  Suzhen Management System - Dockerfile
+#  Based on nginx:alpine for serving frontend static files
 # ============================================================
 FROM nginx:alpine
 
-# 复制自定义 nginx 配置（路径相对于构建上下文，即项目根目录）
+# Copy custom nginx configuration (path relative to build context, i.e., project root)
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 
-# 复制前端静态文件到 nginx 默认发布目录
+# Copy frontend static files to nginx default directory
 COPY frontend /usr/share/nginx/html
 
 EXPOSE 80

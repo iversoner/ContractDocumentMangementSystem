@@ -1,26 +1,26 @@
 @echo off
 
-title suzhenSystem - Stop
+title Suzhen Management System - Stop
 
 cd /d "%~dp0"
 
 echo.
 echo ======================================
-echo   suzhenSystem
-echo   STOP suzhenSystem...
+echo   Suzhen Management System
+echo   Stopping all services...
 echo ======================================
 echo.
 
-echo STOP Docker...
+echo Stopping Docker containers...
 docker compose -f docker/docker-compose.yaml down 2>nul
 if errorlevel 1 docker-compose -f docker/docker-compose.yaml down 2>nul
 
 echo.
 echo ======================================
-echo   ALL SERVICES STOPPED.
+echo   All services stopped.
+echo   Data is preserved on local disk.
 echo ======================================
 echo.
-echo   ALL DATA SOURCE IS SAVED LOCALY
-echo   IF YOU NEED TO CLEAN ALL DATA, PLEASE DELETE THE DATA DIRECTORY.
+echo   To restart, double-click start.bat or setup.bat.
 echo.
 pause

@@ -12,9 +12,10 @@
 |------|----------|
 | 后端 | Python 3.11+ / Flask 3.x / Gunicorn (生产) |
 | 前端 | HTML5 / CSS3 / Vanilla JavaScript |
-| 数据库 | SQLite3 (WAL 模式) |
+| 数据库 | SQLite3 (WAL 模式)，北京时间函数 `beijing_now()` |
 | 文件存储 | 本地文件夹 (用户自选) |
 | 邮件服务 | SMTP (内置于后端) |
+| Excel 导出 | openpyxl 3.x |
 | 部署 | Docker + Docker Compose |
 
 ---
@@ -178,14 +179,14 @@ docker compose -f docker/docker-compose.yaml down
 |------|------|------|
 | 认证 | `POST /api/auth/login` `POST /api/auth/logout` `GET /api/auth/me` | 登出/me需登录 |
 | 仪表盘 | `GET /api/dashboard/stats` `GET /api/dashboard/recent` `GET /api/dashboard/expiring` | 需登录 |
-| 合同 | `GET/POST /api/contracts` `GET/PUT/DELETE /api/contracts/<id>` `PUT /api/contracts/batch` | 需登录 |
-| 专利 | `GET/POST /api/patents` `GET/PUT/DELETE /api/patents/<id>` `PUT /api/patents/batch` | 需登录 |
-| 车险 | `GET/POST /api/insurances` `GET/PUT/DELETE /api/insurances/<id>` `GET /api/insurances/stats` `PUT /api/insurances/batch` | 需登录 |
-| 文件 | `GET /api/files` `POST /api/files/upload` `GET /api/files/<id>/download` `DELETE /api/files/<id>` | 需登录 |
+| 合同 | `GET/POST /api/contracts` `GET/PUT/DELETE /api/contracts/<id>` `PUT /api/contracts/batch` | DELETE需管理员 |
+| 专利 | `GET/POST /api/patents` `GET/PUT/DELETE /api/patents/<id>` `PUT /api/patents/batch` | DELETE需管理员 |
+| 车险 | `GET/POST /api/insurances` `GET/PUT/DELETE /api/insurances/<id>` `GET /api/insurances/stats` `PUT /api/insurances/batch` | DELETE需管理员 |
+| 文件 | `GET /api/files` `POST /api/files/upload` `GET /api/files/<id>/download` `DELETE /api/files/<id>` | DELETE需管理员 |
 | 用户 | `GET/POST /api/users` `PUT /api/users/<id>` `PUT /api/users/<id>/reset-password` `DELETE /api/users/<id>` | POST/PUT/DELETE需管理员 |
 | 日志 | `GET /api/logs` `DELETE /api/logs` | 需登录 |
 | 配置 | `GET/PUT /api/settings` `POST /api/settings/test-email` | PUT/POST需管理员 |
-| 导出 | `POST /api/export` (type: all/byCreate/byExpire, format: json/csv) | 需登录 |
+| 导出 | `POST /api/export` (type: all/byCreate/byExpire, format: json/xlsx) | 需登录 |
 | 扫描 | `POST /api/scan` `POST /api/scan/import` | 需登录 |
 
 ### 快速验证
@@ -240,7 +241,9 @@ reminder:
 
 ---
 
-## 数据库表 (7张)
+## 数据库
+
+### 表结构 (7张)
 
 | 表名 | 说明 |
 |------|------|
@@ -251,6 +254,23 @@ reminder:
 | files | 文件表 |
 | operation_logs | 操作日志表 |
 | settings | 系统配置表 (key-value) |
+
+### 时区处理
+
+SQLite 的 `CURRENT_TIMESTAMP` 返回 UTC 时间，而系统面向中国用户。数据库模块在 `get_db()` 中注册了自定义 SQLite 函数 `beijing_now()`，返回北京时间 (UTC+8) 字符串：
+
+```python
+# backend/database/db.py
+def beijing_now():
+    return datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
+
+# 注册为 SQLite 函数，SQL 中直接调用 beijing_now()
+g.db.create_function('beijing_now', 0, beijing_now)
+```
+
+所有写入时间的 SQL 语句统一使用 `beijing_now()` 而非 `CURRENT_TIMESTAMP`，涉及文件：
+- `backend/services/log_service.py` — 操作日志写入
+- `backend/routes/setting.py` — 配置更新时间的 INSERT/UPDATE
 
 ---
 
@@ -268,6 +288,10 @@ reminder:
 - [x] 可配置列显示（合同/专利/车险页面）
 - [x] 权限分配（管理员全部权限 / 业务员无删除、无系统配置、无用户管理、同角色可见、自己日志可见）
 - [x] 交付打包（预构建 Docker 镜像 + 客户一键启动脚本 + DaoCloud 镜像加速）
+- [x] 时区修复（SQLite 自定义 beijing_now() 函数，统一北京时间写入）
+- [x] 数据导出重写（openpyxl 生成 .xlsx 多 Sheet 工作簿，保存到 /data/exports/）
+- [x] setup.bat IP 获取优化（优先 WLAN 网卡，排除 VMware/VirtualBox 虚拟网卡）
+- [x] Docker 目录扫描（📂 文件夹选择器 + webkitRelativePath → 容器内路径自动填入 + 容错提示）
 
 ---
 
@@ -284,14 +308,14 @@ reminder:
 | 用户管理 | `users.html` | 用户增删改查、角色/状态筛选(手动搜索按钮)、重置密码（管理员专用） |
 | 系统配置 | `settings.html` | 邮箱SMTP配置、数据库配置、到期提醒配置、文件存储配置、测试发送、密码眼睛图标(隐藏=斜杠眼/可见=普通眼) |
 | 系统日志 | `logs.html` | 级别/模块筛选(手动搜索按钮)、关键词搜索、清空日志、分页 |
-| 数据导出 | `export.html` | 三种导出方式(全部/按创建时间/按到期时间)、日期范围选择、JSON/CSV |
+| 数据导出 | `export.html` | 三种导出方式(全部/按创建时间/按到期时间)、日期范围选择、Excel (.xlsx) 导出，生成带格式的多 Sheet 工作簿保存到 `/data/exports/`，前端显示导出文件路径 |
 
 ### 全局技术特性
 
 - **响应式布局**：CSS 变量体系 + 媒体查询三档适配 (PC >992px / 平板 768-992px / 手机 ≤768px)
 - **移动端适配**：汉堡菜单、侧边栏滑出、遮罩层、表格横向滚动
 - **统一布局**：顶部导航栏 + 左侧侧边栏 + 主内容区
-- **API_BASE 自适应**：Docker 部署用 `/api`（相对路径），本地开发用 `http://localhost:5000/api`
+- **API_BASE 自适应**：Docker 部署用 `/api`（相对路径），本地开发用 `http://localhost:5000/api`；`isDocker()` 函数通过判断 `API_BASE === '/api'` 识别运行环境，用于同步模态框等场景的路径提示切换
 - **交互反馈**：Toast 消息、模态框表单、confirm 确认对话框
 - **搜索表单提交**：所有页面筛选/搜索改为手动点击搜索按钮或 Enter 键触发，避免 oninput/onchange 频繁 API 调用
 - **密码可见性切换**：隐藏密码时显示带 CSS 斜杠的眼睛图标，可见时显示普通眼睛图标
@@ -336,6 +360,86 @@ reminder:
 - `frontend/pages/contract.html` — 12 列可配置
 - `frontend/pages/patent.html` — 12 列可配置（含专利号）
 - `frontend/pages/insurance.html` — 14 列可配置（含车牌号、品牌、保险公司、险种、金额）
+
+---
+
+## 数据导出
+
+### 导出格式
+
+系统支持两种导出格式：
+
+| 格式 | 说明 |
+|------|------|
+| JSON | 返回结构化 JSON 数据，保留兼容性 |
+| Excel (.xlsx) | 使用 openpyxl 生成多 Sheet 工作簿，表头蓝底白字加粗，自动列宽 |
+
+### Excel 导出工作簿结构
+
+| Sheet | 数据源 |
+|-------|--------|
+| 合同数据 | contracts 表 |
+| 专利数据 | patents 表 |
+| 车险数据 | insurances 表 |
+
+### 文件存储
+
+- Docker 环境：文件保存到 `/data/exports/`
+- 本地开发：文件保存到 `backend/exports/`
+- 文件名格式：`export_YYYY-MM-DD_HH-mm-ss.xlsx`（北京时间）
+
+### 前端交互
+
+- 导出成功后显示文件名和完整路径
+- 页面底部绿色提示栏展示最近一次导出结果
+
+### 涉及文件
+- `backend/routes/export.py` — 导出 API，`_export_dir()` 自动判断环境
+- `backend/requirements.txt` — `openpyxl>=3.1,<4.0`
+- `docker/Dockerfile.backend` — 构建时安装 openpyxl
+- `frontend/pages/export.html` — 前端导出界面，格式默认 xlsx
+
+---
+
+## 目录扫描 & 批量导入
+
+### 功能概述
+
+合同/专利/车险页面均提供"📂 本地文件同步"按钮，弹出模态框后输入目录路径 → 扫描 → 预览待导入文件 → 一键导入。
+
+### Docker 环境下的路径问题
+
+Docker 容器内后端只能访问 `/data/` 挂载目录，无法识别宿主机路径。前端通过以下方式解决：
+
+1. **`isDocker()` 函数**（`frontend/js/app.js`）：判断 `API_BASE === '/api'` 即运行在 Docker 环境
+2. **📂 文件夹选择器**：每个同步模态框内置隐藏的 `<input type="file" webkitdirectory>`，用户点击 📂 按钮 → 弹出文件管理器 → 选择文件夹 → 前端从 `webkitRelativePath` 提取文件夹名 → 自动构造容器内路径（`/data/文件夹名`）填入输入框 → 自动触发扫描
+3. **提示切换**：Docker 模式下 placeholder 显示 `/data/合同文件`，提示文字说明为容器内路径；本地模式下显示 `D:\合同文件`
+4. **容错提示**：当后端返回"目录不存在"时，Docker 模式下弹出友好提示："请确认已在挂载目录下创建了对应文件夹"
+
+### 涉及文件
+- `frontend/js/app.js` — `isDocker()` 函数
+- `frontend/pages/contract.html` — 同步模态框（📂 按钮 + 文件夹选择器 + 容错）
+- `frontend/pages/patent.html` — 同上
+- `frontend/pages/insurance.html` — 同上
+- `backend/routes/scan.py` — 扫描 & 批量导入 API（无需改动，原本就支持容器内路径）
+
+---
+
+## 一键安装脚本 IP 获取
+
+`setup.bat` 启动时需要获取本机 IPv4 地址，以便用户从局域网其他设备访问。Windows 上可能存在多个虚拟网卡（VMware、VirtualBox 等），简单取第一条 IPv4 可能拿到不可用的 IP。
+
+### 实现
+
+使用 PowerShell 解析 `ipconfig` 输出，按以下优先级选择：
+
+1. 优先匹配 WLAN / Wireless LAN 适配器的 IP
+2. 排除 VMware、VirtualBox 虚拟网卡
+3. 排除回环地址 (127.0.0.1) 和 APIPA 地址 (169.254.x.x)
+4. 以上都不匹配时回退到 `localhost`
+
+### 涉及文件
+- `setup.bat` — 安装脚本的 Step 4 IP 获取逻辑
 
 ---
 

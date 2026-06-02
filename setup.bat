@@ -6,26 +6,25 @@ cd /d "%~dp0"
 
 :: ============================================================
 ::  Suzhen Management System - One-Click Installation Script
-::  Automatically detects environment, installs Docker, configures mirror, and starts services
+::  Detects environment, installs Docker, configures mirror, starts services
 :: ============================================================
 
 :main
 cls
 echo.
 echo  ======================================================================
-echo  U                                                                      U
-echo  U                 Suzhen Management System - One-Click Installation    U
-echo  U                 Suzhen Management System                            U
-echo  U                                                                      U
+echo  =                                                                     =
+echo  =              Suzhen Management System - One-Click Setup             =
+echo  =                                                                     =
 echo  ======================================================================
 echo.
 echo   This script will perform the following operations:
 echo.
 echo     1. Check Docker installation
-echo     2. Configure mirror source
+echo     2. Configure registry mirror
 echo     3. Select data storage directory
-echo     4. Get IP and start services
-echo     5. Build full stack application
+echo     4. Get local IP and configure port
+echo     5. Build and start services
 echo.
 echo  ======================================================================
 echo.
@@ -95,19 +94,19 @@ pause
 exit /b 1
 
 :: ============================================================
-:: Step 2: Configure Docker mirror
+:: Step 2: Configure Docker registry mirror
 :: ============================================================
 :configure_mirror
 cls
 echo.
 echo  ======================================================================
-echo   Step 2/5: Configure Mirror Source
+echo   Step 2/5: Configure Registry Mirror
 echo  ======================================================================
 echo.
-echo   To improve Docker image download speed in China, configure a mirror accelerator:
+echo   To improve Docker image download speed, configure a mirror accelerator:
 echo.
 echo   Recommended sources:
-echo     [1] Alibaba Cloud Mirror (recommended, fast)
+echo     [1] Alibaba Cloud Mirror (fast, recommended)
 echo     [2] 1ms.run Mirror
 echo     [3] Skip, use default (may be slow)
 echo.
@@ -143,7 +142,7 @@ echo   [OK] Configuration written to: %DAEMON_FILE%
 echo.
 echo   [INFO] Changes will take effect after restarting Docker Desktop
 echo   [INFO] If Docker Desktop is running, please restart manually:
-echo         Click system tray icon -> Right click -> Restart
+echo         System tray icon -> Right click -> Restart
 echo.
 
 :: Also try via docker desktop CLI
@@ -161,7 +160,7 @@ echo  ======================================================================
 echo   Step 3/5: Select Data Storage Directory
 echo  ======================================================================
 echo.
-echo   The system needs to store database files and uploaded files on the local disk.
+echo   The system needs to store database and uploaded files on local disk.
 echo   Please select a directory to store this data.
 echo.
 echo   Recommendations:
@@ -206,18 +205,16 @@ echo   Step 4/5: Get Local IP Address
 echo  ======================================================================
 echo.
 
-:: Get local IPv4 address
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
-    set IP=%%a
-    set IP=!IP: =!
-    if not "!IP!"=="" if "!IP!" neq "127.0.0.1" (
-        if "!IP:~0,7!" neq "169.254" (
-            set LOCAL_IP=!IP!
-            goto :ip_found
-        )
-    )
-)
+:: Get local IPv4 address - prefer WLAN adapter over VMware/Ethernet
 set LOCAL_IP=localhost
+
+:: Use PowerShell Get-NetIPAddress to find the best IP: prefer Wi-Fi, skip virtual adapters
+for /f "usebackq tokens=*" %%a in (`powershell -NoProfile -Command ^
+  "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -ne '127.0.0.1' -and $_.IPAddress -notlike '169.254.*' } | ForEach-Object { $iface=$_|Get-NetAdapter; [pscustomobject]@{IP=$_.IPAddress;Name=$iface.Name;IsVM=$iface.Name -match 'VMware|VirtualBox|Hyper-V';IsWLAN=$iface.Name -match 'Wi-Fi|Wireless|WLAN'} } | Sort-Object {if($_.IsVM){2}elseif($_.IsWLAN){0}else{1}} | Select-Object -First 1 -ExpandProperty IP"`) do (
+    set LOCAL_IP=%%a
+)
+
+if "!LOCAL_IP!"=="" set LOCAL_IP=localhost
 
 :ip_found
 echo   Local IP Address: !LOCAL_IP!
@@ -232,12 +229,12 @@ if "!PORT!"=="" set PORT=8080
 cls
 echo.
 echo  ======================================================================
-echo   Step 5/5: Pull Images and Start Services
+echo   Step 5/5: Build Images and Start Services
 echo  ======================================================================
 echo.
 echo   Data directory: !DATA_DIR!
-echo   Service port: !PORT!
-echo   Local IP:   !LOCAL_IP!
+echo   Service port:   !PORT!
+echo   Local IP:       !LOCAL_IP!
 echo.
 echo   Starting to initialize services, this may take a few minutes...
 echo.
@@ -255,7 +252,7 @@ echo   [2/3] Generating configuration file...
 ) > docker\.env
 
 :: Start services
-echo   [3/3] Pulling images and starting services (first run will be slower)...
+echo   [3/3] Building images and starting services (first run will be slower)...
 echo.
 docker compose -f docker/docker-compose.yaml up -d --build
 if errorlevel 1 (
@@ -285,9 +282,9 @@ timeout /t 5 >nul
 cls
 echo.
 echo  ======================================================================
-echo  U                                                                      U
-echo  U                     Installation Successful!                        U
-echo  U                                                                      U
+echo                                                                       
+echo                       Installation Successful!                        
+echo                                                                        
 echo  ======================================================================
 echo.
 echo    System Access Address:
@@ -300,7 +297,7 @@ if "!LOCAL_IP!"=="localhost" (
 )
 echo.
 echo  ======================================================================
-echo    First Login Credentials
+echo    Initial Login Credentials
 echo  ======================================================================
 echo.
 echo       Username:   admin
@@ -319,8 +316,8 @@ echo  ======================================================================
 echo    Common Commands
 echo  ======================================================================
 echo.
-echo       Stop services:   Double-click stop.bat
-echo       View logs:   docker compose -f docker/docker-compose.yaml logs -f
+echo       Stop services:      Double-click stop.bat
+echo       View logs:          docker compose -f docker/docker-compose.yaml logs -f
 echo       Restart services:   docker compose -f docker/docker-compose.yaml restart
 echo.
 echo  ======================================================================
