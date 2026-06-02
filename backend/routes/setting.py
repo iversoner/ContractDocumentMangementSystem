@@ -3,7 +3,7 @@
 """
 from flask import Blueprint, request, jsonify, g
 
-from database.db import get_db
+from database.db import get_db, beijing_now
 from services.email_service import send_email
 from services.log_service import write_log
 from middleware.auth_middleware import login_required, admin_required
@@ -95,8 +95,8 @@ def update_settings():
 
     for key, value in updates:
         db.execute(
-            "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) "
-            "ON CONFLICT(key) DO UPDATE SET value=?, updated_at=CURRENT_TIMESTAMP",
+            "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, beijing_now()) "
+            "ON CONFLICT(key) DO UPDATE SET value=?, updated_at=beijing_now()",
             (key, value, value)
         )
     db.commit()
