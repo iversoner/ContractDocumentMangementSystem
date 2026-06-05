@@ -22,8 +22,10 @@ services:
       - suzhen-net
     environment:
       - FLASK_DEBUG=false
+      - SECRET_KEY=${SECRET_KEY:-suzhen-secret-key-change-in-production}
       - DATABASE_PATH=/data/suzhen.db
       - STORAGE_UPLOAD_FOLDER=/data/uploads
+      - HOST_DATA_DIR=${HOST_DATA_DIR}
 
   # ---- Frontend nginx Service ----
   frontend:

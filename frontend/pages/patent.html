@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>专利管理 - 素珍管理系统</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
@@ -134,11 +135,13 @@
               <th data-col="holder">权利人</th>
               <th data-col="agent">对接业务员</th>
               <th data-col="createdAt">创建时间</th>
+              <th data-col="updatedAt">更新时间</th>
               <th data-col="expireDate">到期时间</th>
               <th data-col="status">状态</th>
               <th data-col="emailReminder">邮件提醒</th>
               <th data-col="priority">重要等级</th>
               <th data-col="filePath">本地文件</th>
+              <th data-col="source">来源</th>
               <th data-col="remark">备注</th>
               <th data-col="actions">操作</th>
             </tr>
@@ -247,21 +250,23 @@
 
   <!-- ===== 本地文件同步模态框 ===== -->
   <div class="modal-backdrop" id="syncModal">
-    <div class="modal">
+    <div class="modal" style="max-width:700px;">
       <div class="modal-header">
         <h2>📂 本地文件同步</h2>
         <button class="modal-close" onclick="closeModal('syncModal')">&times;</button>
       </div>
       <div class="form-group">
         <label>本地目录路径</label>
-        <input type="text" class="form-control" id="syncDirectory" placeholder="例如: D:\专利文件">
-        <small style="color:var(--text-muted);">输入包含专利文件的文件夹路径，点击"扫描"查看可导入的文件</small>
+        <div style="display:flex; gap:8px;">
+          <input type="text" class="form-control" id="syncDirectory" placeholder="例如: E:\GitProject\Private\Data\patent\2011" style="flex:1;">
+          <button type="button" class="btn btn-primary" id="syncScanBtn" onclick="ScanHelper.scanDirectory()">🔍 扫描</button>
+        </div>
+        <small style="color:var(--text-muted);">输入包含专利文件的文件夹路径，支持浏览子目录选择导入</small>
       </div>
-      <div id="syncResult" style="max-height:300px; overflow-y:auto; margin:12px 0;"></div>
+      <div id="syncResult" style="max-height:400px; overflow-y:auto; margin:12px 0; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px;"></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" onclick="closeModal('syncModal')">关闭</button>
-        <button type="button" class="btn btn-primary" id="syncScanBtn" onclick="scanDirectory()">🔍 扫描文件</button>
-        <button type="button" class="btn btn-primary" id="syncImportBtn" onclick="importFiles()" style="display:none;">📥 一键导入</button>
+        <button type="button" class="btn btn-primary" id="syncImportBtn" onclick="ScanHelper.importFiles()" style="display:none;">📥 导入选中文件</button>
       </div>
     </div>
   </div>
@@ -301,11 +306,13 @@
             <td data-col="holder">${p.holder}</td>
             <td data-col="agent">${p.agent}</td>
             <td data-col="createdAt">${p.createdAt || p.createTime}</td>
+            <td data-col="updatedAt">${p.updatedAt || '-'}</td>
             <td data-col="expireDate">${p.expireDate}</td>
             <td data-col="status">${getStatusBadge(p.status)}</td>
             <td data-col="emailReminder"><input type="checkbox" ${p.emailReminder !== false ? 'checked' : ''} onchange="toggleReminder('patents', ${p.id}, this.checked)" title="邮件提醒"></td>
             <td data-col="priority">${getPriorityBadge(p.priority)}</td>
             <td data-col="filePath"><a href="javascript:void(0)" onclick="showToast('文件链接(模拟): ${p.filePath}', 'info')">📎 查看</a></td>
+            <td data-col="source"><span class="badge ${p.source === 'scan' ? 'badge-info' : 'badge-default'}">${p.source === 'scan' ? '扫描导入' : '手动录入'}</span></td>
             <td data-col="remark">${p.remark || '-'}</td>
             <td data-col="actions">
               <button class="btn btn-outline btn-sm" onclick="editPatent(${p.id})">编辑</button>
@@ -430,59 +437,8 @@
     }
 
     // ---- 本地文件同步 ----
-    let syncNewFiles = [];
-
     function openSyncModal() {
-      document.getElementById('syncDirectory').value = '';
-      document.getElementById('syncResult').innerHTML = '';
-      document.getElementById('syncImportBtn').style.display = 'none';
-      syncNewFiles = [];
-      openModal('syncModal');
-    }
-
-    async function scanDirectory() {
-      const dir = document.getElementById('syncDirectory').value.trim();
-      if (!dir) { showToast('请输入目录路径', 'error'); return; }
-      const btn = document.getElementById('syncScanBtn');
-      btn.disabled = true; btn.textContent = '扫描中...';
-      try {
-        const res = await API.post('/scan', { directory: dir, module: 'patent' });
-        const d = res.data;
-        syncNewFiles = d.newFiles;
-        let html = `<div style="margin-bottom:8px; color:var(--text-muted);">
-          共 ${d.total} 个文件，其中 <b style="color:var(--success);">${d.newCount}</b> 个待导入，<b>${d.existingCount}</b> 个已存在</div>`;
-        if (d.newFiles.length > 0) {
-          html += '<table><thead><tr><th>文件名</th><th>大小</th></tr></thead><tbody>';
-          d.newFiles.forEach(f => {
-            html += `<tr><td>📄 ${f.name}</td><td>${(f.size / 1024).toFixed(1)} KB</td></tr>`;
-          });
-          html += '</tbody></table>';
-          document.getElementById('syncImportBtn').style.display = '';
-        } else if (d.total === 0) {
-          html += '<p style="color:var(--text-muted);">目录为空，未找到支持的文件</p>';
-        } else {
-          html += '<p style="color:var(--text-muted);">所有文件已同步，无需导入</p>';
-        }
-        document.getElementById('syncResult').innerHTML = html;
-      } catch (err) { showToast('扫描失败: ' + err.message, 'error'); }
-      finally { btn.disabled = false; btn.textContent = '🔍 扫描文件'; }
-    }
-
-    async function importFiles() {
-      if (syncNewFiles.length === 0) { showToast('没有可导入的文件', 'error'); return; }
-      const btn = document.getElementById('syncImportBtn');
-      btn.disabled = true; btn.textContent = '导入中...';
-      try {
-        const res = await API.post('/scan/import', {
-          module: 'patent',
-          files: syncNewFiles,
-          category: ''
-        });
-        showToast(res.message, 'success');
-        closeModal('syncModal');
-        renderPatentTable();
-      } catch (err) { showToast('导入失败: ' + err.message, 'error'); }
-      finally { btn.disabled = false; btn.textContent = '📥 一键导入'; }
+      ScanHelper.openModal();
     }
 
     // ---- 批量操作 & 邮件提醒 ----
@@ -538,11 +494,13 @@
       { key: 'holder', label: '权利人', defaultVisible: true },
       { key: 'agent', label: '对接业务员', defaultVisible: true },
       { key: 'createdAt', label: '创建时间', defaultVisible: false },
+      { key: 'updatedAt', label: '更新时间', defaultVisible: false },
       { key: 'expireDate', label: '到期时间', defaultVisible: true },
       { key: 'status', label: '状态', defaultVisible: true },
       { key: 'emailReminder', label: '邮件提醒', defaultVisible: false },
       { key: 'priority', label: '重要等级', defaultVisible: false },
       { key: 'filePath', label: '本地文件', defaultVisible: false },
+      { key: 'source', label: '来源', defaultVisible: false },
       { key: 'remark', label: '备注', defaultVisible: true },
     ];
 
@@ -619,7 +577,10 @@
       }
     });
 
-    document.addEventListener('DOMContentLoaded', renderPatentTable);
+    document.addEventListener('DOMContentLoaded', function() {
+      ScanHelper.init('patent', function() { renderPatentTable(); });
+      renderPatentTable();
+    });
   </script>
 </body>
 </html>

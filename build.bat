@@ -100,7 +100,7 @@ echo.
 echo   [3/3] Packaging build\ into suzhen-system-v1.0.zip ...
 echo.
 
-powershell -Command "Compress-Archive -Path 'build\*' -DestinationPath 'suzhen-system-v1.0.zip' -Force"
+powershell -Command "Compress-Archive -Path 'build\setup.bat', 'build\stop.bat', 'build\suzhen-images.tar', 'build\docker-compose.yaml', 'build\nginx.conf' -DestinationPath 'suzhen-system-v1.0.zip' -Force"
 if errorlevel 1 (
     echo   [ERROR] Packaging failed!
     pause

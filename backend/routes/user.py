@@ -99,6 +99,19 @@ def create_user():
     return jsonify({'success': True, 'message': '用户已添加', 'data': _row_to_dict(r)}), 201
 
 
+@user_bp.route('/<int:id>', methods=['GET'])
+@login_required
+def get_user(id):
+    db = get_db()
+    r = db.execute("SELECT * FROM users WHERE id = ?", (id,)).fetchone()
+    if not r:
+        return jsonify({'success': False, 'message': '用户不存在'}), 404
+    # 非管理员只能查看同角色用户
+    if g.role != '管理员' and r['role'] != g.role:
+        return jsonify({'success': False, 'message': '无权访问'}), 403
+    return jsonify({'success': True, 'data': _row_to_dict(r)})
+
+
 @user_bp.route('/<int:id>', methods=['PUT'])
 @admin_required
 def update_user(id):

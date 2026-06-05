@@ -354,6 +354,8 @@ table tbody tr:hover {
 .badge.expired  { background: #fff2f0; color: var(--danger);  border: 1px solid #ffccc7; }
 .badge.expiring { background: #fffbe6; color: #d48806;        border: 1px solid #ffe58f; }
 .badge.pending  { background: #e6f7ff; color: var(--primary); border: 1px solid #91d5ff; }
+.badge.info     { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+.badge.default  { background: #fafafa; color: #8c8c8c; border: 1px solid #d9d9d9; }
 
 /* --- 按钮 --- */
 .btn {
@@ -980,4 +982,33 @@ textarea.form-control {
 .column-toggle-panel input[type="checkbox"] {
   margin: 0;
   cursor: pointer;
+}
+
+/* --- 文件同步模态框增强 --- */
+#syncResult table {
+  font-size: 12px;
+  width: 100%;
+}
+
+#syncResult table thead th {
+  padding: 6px 8px;
+  font-size: 12px;
+  background: var(--bg-body);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+#syncResult table tbody td {
+  padding: 6px 8px;
+}
+
+#syncResult .btn-outline.btn-sm {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+/* 面包屑链接 hover */
+#syncResult a[onclick*="ScanHelper"]:hover {
+  text-decoration: underline !important;
 }

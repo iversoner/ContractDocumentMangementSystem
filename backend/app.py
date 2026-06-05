@@ -36,6 +36,7 @@ def create_app(config_path=None):
     app.config['EMAIL_SENDER_NAME'] = os.environ.get('EMAIL_SENDER_NAME', config['email']['sender_name'])
     app.config['REMINDER_ENABLED'] = os.environ.get('REMINDER_ENABLED', str(config['reminder']['enabled'])).lower() == 'true'
     app.config['REMINDER_DAYS_BEFORE'] = int(os.environ.get('REMINDER_DAYS_BEFORE', config['reminder']['days_before']))
+    app.config['HOST_DATA_DIR'] = os.environ.get('HOST_DATA_DIR', config.get('host_data_dir', ''))
 
     # ---- CORS 跨域 ----
     CORS(app, supports_credentials=True)

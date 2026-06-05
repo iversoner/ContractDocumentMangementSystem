@@ -249,6 +249,7 @@ echo   [2/3] Generating configuration file...
 (
     echo DATA_DIR=!DOCKER_DATA_DIR!
     echo APP_PORT=!PORT!
+    echo HOST_DATA_DIR=!DATA_DIR!
 ) > docker\.env
 
 :: Start services

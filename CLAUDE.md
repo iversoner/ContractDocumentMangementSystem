@@ -528,3 +528,96 @@ suzhen-system-v1.0.zip
 - Python 源码在 Docker 镜像内部（`/app`），客户无法直接访问
 - 交付包中不包含任何 `.py`、`.html`、`.js` 源码文件
 - 如需进一步加固，后续可考虑 Cython 编译或 PyArmor 混淆
+
+---
+
+## 改动后自检
+
+**每次改动代码后，必须执行自检。** 根据改动范围选择冒烟测试或全量自检。
+
+### 判断标准
+
+| 条件 | 自检级别 |
+|------|----------|
+| 仅前端或仅后端、≤10 个文件 | **冒烟测试** |
+| 前后端都涉及、或 >10 个文件 | **全量自检** |
+
+### 冒烟测试（约 2 分钟）
+
+按顺序验证核心链路是否正常：
+
+1. **后端启动** — `python backend/run.py`，确认无 import 错误和启动异常
+2. **登录 API** — `curl -X POST http://localhost:5000/api/auth/login -H "Content-Type: application/json" -d '{"username":"admin","password":"admin!"}'`，确认返回 token
+3. **仪表盘 API** — 用 token 请求 `GET /api/dashboard/stats`，确认返回统计数据
+4. **改动模块 API** — 如果改了某个路由，用 curl 验证该路由的核心接口（GET 列表 / POST 新增）
+5. **前端页面加载** — 检查改动的 HTML 页面：JS 语法无误、DOM 元素 ID 与 JS 中引用一致
+
+### 全量自检（约 10 分钟）
+
+覆盖所有核心功能链路：
+
+#### 后端 API（用 curl 逐项验证）
+
+| # | 验证项 | 命令 |
+|---|--------|------|
+| 1 | 登录 | `POST /api/auth/login` → token |
+| 2 | 当前用户 | `GET /api/auth/me` |
+| 3 | 仪表盘统计 | `GET /api/dashboard/stats` |
+| 4 | 仪表盘最近 | `GET /api/dashboard/recent` |
+| 5 | 仪表盘到期 | `GET /api/dashboard/expiring` |
+| 6 | 合同 CRUD | `GET/POST /api/contracts` + `GET/PUT/DELETE /api/contracts/<id>` |
+| 7 | 合同批量 | `PUT /api/contracts/batch` |
+| 8 | 专利 CRUD | `GET/POST /api/patents` + `GET/PUT/DELETE /api/patents/<id>` |
+| 9 | 专利批量 | `PUT /api/patents/batch` |
+| 10 | 车险 CRUD | `GET/POST /api/insurances` + `GET/PUT/DELETE /api/insurances/<id>` |
+| 11 | 车险统计 | `GET /api/insurances/stats` |
+| 12 | 车险批量 | `PUT /api/insurances/batch` |
+| 13 | 文件列表 | `GET /api/files` |
+| 14 | 文件上传 | `POST /api/files/upload` (multipart) |
+| 15 | 文件下载 | `GET /api/files/<id>/download` |
+| 16 | 用户 CRUD | `GET/POST /api/users` + `GET/PUT/DELETE /api/users/<id>` |
+| 17 | 重置密码 | `PUT /api/users/<id>/reset-password` |
+| 18 | 日志 | `GET /api/logs` |
+| 19 | 配置读写 | `GET/PUT /api/settings` |
+| 20 | 测试邮件 | `POST /api/settings/test-email` |
+| 21 | 数据导出 | `POST /api/export` |
+| 22 | 目录扫描 | `POST /api/scan` |
+| 23 | 批量导入 | `POST /api/scan/import` |
+
+#### 前端页面（逐一打开检查）
+
+| # | 页面 | 检查点 |
+|---|------|--------|
+| 1 | `index.html` | 登录表单正常，输入账号密码可登录 |
+| 2 | `dashboard.html` | 统计卡片、到期提醒、最近项目正常展示 |
+| 3 | `contract.html` | 列表加载、筛选、新增/编辑弹窗、批量操作、列配置 |
+| 4 | `patent.html` | 列表加载、筛选、新增/编辑弹窗、批量操作 |
+| 5 | `insurance.html` | 统计卡片、列表加载、筛选、新增/编辑弹窗 |
+| 6 | `files.html` | 列表加载、上传按钮弹出文件选择、下载 |
+| 7 | `users.html` | 列表加载、新增/编辑/重置密码 |
+| 8 | `settings.html` | 配置加载、保存、测试邮件 |
+| 9 | `logs.html` | 日志列表加载、筛选、清空 |
+| 10 | `export.html` | 导出操作、结果提示 |
+
+#### 权限校验
+
+| # | 验证项 |
+|---|--------|
+| 1 | 业务员登录后看不到"用户管理""系统配置"菜单 |
+| 2 | 业务员看不到删除按钮 |
+| 3 | 业务员访问 users.html 被重定向到 dashboard |
+| 4 | 业务员 settings.html 表单为只读 |
+| 5 | 业务员调用 DELETE API 返回 403 |
+
+#### Docker 配置校验
+
+```bash
+# 验证 compose 文件格式正确
+docker compose -f docker/docker-compose.yaml config --quiet
+docker compose -f build/docker-compose.yaml config --quiet
+```
+
+### 自检后
+
+- 自检中发现的问题必须修复后重新自检
+- 通过后更新 `requirement/bugfix.md`（如有 bug 修复）
