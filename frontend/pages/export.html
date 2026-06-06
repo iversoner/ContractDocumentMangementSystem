@@ -124,6 +124,8 @@
         <button class="btn btn-primary" onclick="doExport()" style="padding: 8px 32px;">📥 开始导出</button>
       </div>
     </div>
+
+    <!-- 导出弹窗由 showBlueDialog() 动态创建 -->
   </main>
 
   <script src="../js/app.js"></script>
@@ -132,7 +134,7 @@
       const selected = document.querySelector('input[name="exportType"]:checked');
       if (!selected) { showToast('请选择导出方式', 'warning'); return; }
       const type = selected.value;
-      const body = { type, format: 'json' };
+      const body = { type, format: 'xlsx' };
 
       if (type === 'byCreate') {
         const s = document.getElementById('startCreate').value;
@@ -146,14 +148,42 @@
         body.startDate = s; body.endDate = e;
       }
 
+      // 显示加载弹窗
+      showBlueDialog('exportDlg', {
+        icon: '⏳', title: '正在导出数据...',
+        body: '<div style="text-align:center;"><div style="display:inline-block;width:40px;height:40px;border:3px solid #e8e8e8;border-top-color:#1890ff;border-radius:50%;animation:spin 0.8s linear infinite;"></div><p style="margin-top:16px;color:#666;font-size:14px;">正在从数据库查询数据并生成 Excel 文件，请稍候...</p></div>',
+        footer: ''
+      });
+
       try {
         const res = await API.post('/export', body);
-        if (res.data) {
-          const info = res.data.exportInfo;
-          showToast('导出成功! 合同' + info.totalContracts + '条, 专利' + info.totalPatents + '条, 车险' + info.totalInsurances + '条', 'success');
+        if (res.success) {
+          var info = res.data.exportInfo;
+          var fp = res.data.filepath || '';
+          showBlueDialog('exportDlg', {
+            icon: '✅', title: '导出完成',
+            body: '<div style="display:flex;justify-content:space-around;margin-bottom:20px;">' +
+              '<div style="text-align:center;"><div style="font-size:28px;font-weight:700;color:#1890ff;">' + (info.totalContracts||0) + '</div><div style="font-size:12px;color:#999;">合同</div></div>' +
+              '<div style="text-align:center;"><div style="font-size:28px;font-weight:700;color:#1890ff;">' + (info.totalPatents||0) + '</div><div style="font-size:12px;color:#999;">专利</div></div>' +
+              '<div style="text-align:center;"><div style="font-size:28px;font-weight:700;color:#1890ff;">' + (info.totalInsurances||0) + '</div><div style="font-size:12px;color:#999;">车险</div></div>' +
+              '</div>' +
+              '<div style="background:#f6ffed;border:1px solid #b7eb8f;border-radius:6px;padding:12px;">' +
+              '<div style="font-size:12px;color:#52c41a;margin-bottom:4px;">📁 文件已保存至：</div>' +
+              '<div style="font-size:12px;color:#333;word-break:break-all;font-family:Consolas,monospace;">' + escHtml(fp) + '</div>' +
+              '</div>',
+            footer: '<button class="btn btn-primary" onclick="closeBlueDialog(\'exportDlg\')" style="min-width:100px;">确定</button>'
+          });
         }
-      } catch (err) { showToast('导出失败: ' + err.message, 'error'); }
+      } catch (err) {
+        showBlueDialog('exportDlg', {
+          icon: '❌', title: '导出失败',
+          body: '<p style="text-align:center;color:#ff4d4f;">' + escHtml(err.message) + '</p>',
+          footer: '<button class="btn btn-outline" onclick="closeBlueDialog(\'exportDlg\')">关闭</button>'
+        });
+      }
     }
+
+    function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
     function toggleExportOption(type) {
       // 控制日期范围显示

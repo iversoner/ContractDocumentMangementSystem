@@ -14,6 +14,22 @@ def beijing_now():
     return datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
 
 
+def host_file_path(container_path):
+    """将容器内路径转为宿主机 Windows 路径"""
+    if not container_path:
+        return ''
+    host_data_dir = current_app.config.get('HOST_DATA_DIR', '')
+    db_path = current_app.config.get('DATABASE_PATH', '')
+    if db_path.startswith('/data/') and host_data_dir:
+        # /data/xxx/yyy → HOST_DATA_DIR\xxx\yyy
+        if container_path.startswith('/data/'):
+            rel = container_path[6:]
+        else:
+            rel = container_path
+        return host_data_dir.rstrip('\\') + '\\' + rel.replace('/', '\\')
+    return container_path
+
+
 def utc_to_beijing(utc_str):
     """将 UTC 时间字符串转为北京时间字符串"""
     if not utc_str:
@@ -98,6 +114,32 @@ def init_db():
             db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
     db.commit()
 
+    # ---- Schema 迁移：为旧表补充 file_name 字段 ----
+    file_name_migrations = [
+        ("contracts", "file_name", "TEXT DEFAULT ''"),
+        ("patents", "file_name", "TEXT DEFAULT ''"),
+        ("insurances", "file_name", "TEXT DEFAULT ''"),
+    ]
+    for table, col, col_def in file_name_migrations:
+        existing = db.execute(f"PRAGMA table_info({table})").fetchall()
+        col_names = [r[1] for r in existing]
+        if col not in col_names:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+    db.commit()
+
+    # ---- Schema 迁移：为旧表补充 is_complete 字段 ----
+    is_complete_migrations = [
+        ("contracts", "is_complete", "INTEGER DEFAULT 1"),
+        ("patents", "is_complete", "INTEGER DEFAULT 1"),
+        ("insurances", "is_complete", "INTEGER DEFAULT 1"),
+    ]
+    for table, col, col_def in is_complete_migrations:
+        existing = db.execute(f"PRAGMA table_info({table})").fetchall()
+        col_names = [r[1] for r in existing]
+        if col not in col_names:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+    db.commit()
+
     # 创建默认管理员（如不存在）
     admin_config = current_app.config.get('ADMIN_CONFIG', {})
     username = admin_config.get('username', 'admin')
@@ -106,7 +148,7 @@ def init_db():
         from services.auth_service import hash_password
         password_hash = hash_password(admin_config.get('password', 'admin123'))
         db.execute(
-            "INSERT INTO users (username, password_hash, display_name, email, role, status) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO users (username, password_hash, display_name, email, role, status) VALUES (?, ?, ?, ?, ?, ?)",
             (username, password_hash,
              admin_config.get('display_name', '管理员'),
              admin_config.get('email', ''),

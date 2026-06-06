@@ -23,11 +23,11 @@ admin:
 
 # Email service configuration
 email:
-  smtp_server: smtp.example.com
-  smtp_port: 587
-  username: notify@suzhen.com
+  smtp_server: smtp.163.com
+  smtp_port: 465
+  username: ""
   password: ""
-  use_tls: true
+  use_tls: false
   sender_name: Suzhen Management System
 
 # File storage

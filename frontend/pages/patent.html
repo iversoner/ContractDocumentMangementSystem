@@ -129,19 +129,20 @@
             <tr>
               <th data-col="select"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" title="全选"></th>
               <th data-col="id">ID</th>
-              <th data-col="name">专利名称</th>
+              <th data-col="name" class="sortable-th" onclick="handleSort('name')">专利名称<span class="sort-icon">⇅</span></th>
               <th data-col="patentNo">专利号</th>
               <th data-col="type">类型</th>
               <th data-col="holder">权利人</th>
               <th data-col="agent">对接业务员</th>
               <th data-col="createdAt">创建时间</th>
               <th data-col="updatedAt">更新时间</th>
-              <th data-col="expireDate">到期时间</th>
+              <th data-col="expireDate" class="sortable-th" onclick="handleSort('expire_date')">到期时间<span class="sort-icon">⇅</span></th>
               <th data-col="status">状态</th>
               <th data-col="emailReminder">邮件提醒</th>
-              <th data-col="priority">重要等级</th>
+              <th data-col="priority" class="sortable-th" onclick="handleSort('priority')">重要等级<span class="sort-icon">⇅</span></th>
               <th data-col="filePath">本地文件</th>
               <th data-col="source">来源</th>
+              <th data-col="isComplete">完整性</th>
               <th data-col="remark">备注</th>
               <th data-col="actions">操作</th>
             </tr>
@@ -202,12 +203,6 @@
           </div>
         </div>
         <div class="form-group">
-          <label>附件上传</label>
-          <input type="file" class="form-control" id="patentFile" style="padding:5px;">
-          <input type="hidden" id="patentFilePath">
-          <small style="color:var(--text-muted);">选择文件后自动上传，或留空跳过</small>
-        </div>
-        <div class="form-group">
           <label>备注</label>
           <textarea class="form-control" id="patentRemark" placeholder="备注信息（选填）"></textarea>
         </div>
@@ -255,18 +250,19 @@
         <h2>📂 本地文件同步</h2>
         <button class="modal-close" onclick="closeModal('syncModal')">&times;</button>
       </div>
-      <div class="form-group">
-        <label>本地目录路径</label>
-        <div style="display:flex; gap:8px;">
-          <input type="text" class="form-control" id="syncDirectory" placeholder="例如: E:\GitProject\Private\Data\patent\2011" style="flex:1;">
-          <button type="button" class="btn btn-primary" id="syncScanBtn" onclick="ScanHelper.scanDirectory()">🔍 扫描</button>
+      <div style="padding:12px 0;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="ScanHelper.goRoot()" title="返回根目录">🏠</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="ScanHelper.goUp()" title="返回上级">⬆</button>
+          <span style="font-size:12px; color:var(--text-muted);" id="syncCurrentDir" data-parent="">/data</span>
+          <span id="syncNewBadge" class="badge active" style="font-size:10px; display:none;"></span>
         </div>
-        <small style="color:var(--text-muted);">输入包含专利文件的文件夹路径，支持浏览子目录选择导入</small>
+        <small style="color:var(--text-muted);">勾选要导入的目录，系统将导入目录下所有未录入的文件（递归包含子目录）。已导入的文件不会重复录入。</small>
       </div>
       <div id="syncResult" style="max-height:400px; overflow-y:auto; margin:12px 0; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px;"></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" onclick="closeModal('syncModal')">关闭</button>
-        <button type="button" class="btn btn-primary" id="syncImportBtn" onclick="ScanHelper.importFiles()" style="display:none;">📥 导入选中文件</button>
+        <button type="button" class="btn btn-primary" id="syncImportBtn" onclick="ScanHelper.importDirs()" style="display:none;">📥 导入选中目录</button>
       </div>
     </div>
   </div>
@@ -275,12 +271,30 @@
   <script>
     let patentPage = 1;
     const patentPageSize = 8;
+    let sortState = { by: null, order: null };
+
+    function handleSort(colKey) {
+      if (sortState.by === colKey) {
+        sortState.order = sortState.order === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortState.by = colKey;
+        sortState.order = 'asc';
+      }
+      patentPage = 1;
+      renderPatentTable();
+    }
+
+    function renderSortIcon(colKey) {
+      if (sortState.by !== colKey) return ' <span class="sort-icon">⇅</span>';
+      return sortState.order === 'asc' ? ' <span class="sort-icon" style="color:#1890ff;">▲</span>' : ' <span class="sort-icon" style="color:#1890ff;">▼</span>';
+    }
 
     async function loadPatents() {
       const params = { page: patentPage, pageSize: patentPageSize };
       if (document.getElementById('filterPatentType').value) params.type = document.getElementById('filterPatentType').value;
       if (document.getElementById('filterPatentStatus').value) params.status = document.getElementById('filterPatentStatus').value;
       if (document.getElementById('patentSearch').value) params.keyword = document.getElementById('patentSearch').value;
+      if (sortState.by) { params.sortBy = sortState.by; params.sortOrder = sortState.order; }
       try { const res = await API.get('/patents', params); return res.data; }
       catch (err) { showToast('加载失败: ' + err.message, 'error'); return { items: [], total: 0 }; }
     }
@@ -311,8 +325,9 @@
             <td data-col="status">${getStatusBadge(p.status)}</td>
             <td data-col="emailReminder"><input type="checkbox" ${p.emailReminder !== false ? 'checked' : ''} onchange="toggleReminder('patents', ${p.id}, this.checked)" title="邮件提醒"></td>
             <td data-col="priority">${getPriorityBadge(p.priority)}</td>
-            <td data-col="filePath"><a href="javascript:void(0)" onclick="showToast('文件链接(模拟): ${p.filePath}', 'info')">📎 查看</a></td>
+            <td data-col="filePath">${p.hostFilePath ? `<a href="javascript:void(0)" onclick="showFilePathDialog('${p.hostFilePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="${p.hostFilePath.replace(/\\/g, '\\\\')}">📎 查看</a>` : '<span style="color:var(--text-muted);">-</span>'}</td>
             <td data-col="source"><span class="badge ${p.source === 'scan' ? 'badge-info' : 'badge-default'}">${p.source === 'scan' ? '扫描导入' : '手动录入'}</span></td>
+            <td data-col="isComplete">${getIsCompleteBadge(p.isComplete)}</td>
             <td data-col="remark">${p.remark || '-'}</td>
             <td data-col="actions">
               <button class="btn btn-outline btn-sm" onclick="editPatent(${p.id})">编辑</button>
@@ -323,6 +338,7 @@
       }
 
       applyColumnVisibility();
+      updateSortIcons();
 
       const totalPages = Math.ceil(data.total / patentPageSize);
       const pag = document.getElementById('patentPagination');
@@ -337,6 +353,26 @@
 
     function goPatentPage(p) { patentPage = p; renderPatentTable(); }
 
+    function updateSortIcons() {
+      document.querySelectorAll('.sortable-th').forEach(function(th) {
+        var colKey = th.getAttribute('onclick').match(/handleSort\('(\w+)'\)/);
+        if (!colKey) return;
+        var icon = th.querySelector('.sort-icon');
+        if (!icon) return;
+        colKey = colKey[1];
+        if (sortState.by !== colKey) {
+          icon.textContent = '⇅';
+          icon.style.color = '#ccc';
+        } else if (sortState.order === 'asc') {
+          icon.textContent = '▲';
+          icon.style.color = '#1890ff';
+        } else {
+          icon.textContent = '▼';
+          icon.style.color = '#1890ff';
+        }
+      });
+    }
+
     async function deletePatent(id, name) {
       if (!confirm('确定删除专利「' + name + '」吗？')) return;
       try { await API.del('/patents/' + id); showToast('专利已删除', 'success'); renderPatentTable(); }
@@ -346,33 +382,15 @@
     function openPatentModal() {
       document.getElementById('patentModalTitle').textContent = '新增专利';
       const today = new Date().toISOString().substring(0, 10);
-      ['patentId','patentName','patentNo','patentType','patentHolder','patentAgent','patentFilePath','patentRemark'].forEach(id => {
+      ['patentId','patentName','patentNo','patentType','patentHolder','patentAgent','patentRemark'].forEach(id => {
         document.getElementById(id).value = '';
       });
       document.getElementById('patentCreateDate').value = today;
       document.getElementById('patentExpireDate').value = '';
-      document.getElementById('patentFile').value = '';
       document.getElementById('patentEmailReminder').checked = true;
       document.getElementById('patentPriority').value = '普通';
       openModal('patentModal');
     }
-
-    // Auto-upload file when selected
-    document.getElementById('patentFile').addEventListener('change', async function() {
-      const file = this.files[0];
-      if (!file) return;
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('category', '专利');
-      try {
-        const res = await API.upload('/files/upload', formData);
-        document.getElementById('patentFilePath').value = res.data.storedPath;
-        showToast('文件已上传', 'success');
-      } catch (err) {
-        showToast('文件上传失败: ' + err.message, 'error');
-        this.value = '';
-      }
-    });
 
     function editPatent(id) {
       API.get('/patents/' + id).then(res => { const p = res.data;
@@ -385,7 +403,6 @@
       document.getElementById('patentAgent').value = p.agent;
       document.getElementById('patentCreateDate').value = (p.applicationDate || p.createdAt || '').substring(0, 10);
       document.getElementById('patentExpireDate').value = p.expireDate;
-      document.getElementById('patentFilePath').value = p.filePath || '';
       document.getElementById('patentRemark').value = p.remark || '';
       document.getElementById('patentEmailReminder').checked = p.emailReminder !== false;
       document.getElementById('patentPriority').value = p.priority || '普通';
@@ -404,7 +421,6 @@
         agent: document.getElementById('patentAgent').value,
         applicationDate: document.getElementById('patentCreateDate').value,
         expireDate: document.getElementById('patentExpireDate').value,
-        filePath: document.getElementById('patentFilePath').value,
         remark: document.getElementById('patentRemark').value,
         emailReminder: document.getElementById('patentEmailReminder').checked,
         priority: document.getElementById('patentPriority').value,
@@ -428,7 +444,7 @@
           <div><strong>状态：</strong>${getStatusBadge(p.status)}</div>
           <div><strong>创建时间：</strong>${p.createdAt || p.createTime}</div>
           <div><strong>到期时间：</strong>${p.expireDate || p.expireTime}</div>
-          <div><strong>文件路径：</strong>${p.filePath}</div>
+          <div><strong>文件路径：</strong>${p.hostFilePath || '无'}</div>
           <div style="grid-column: 1/-1;"><strong>备注：</strong>${p.remark || '无'}</div>
         </div>
       `;
@@ -501,6 +517,7 @@
       { key: 'priority', label: '重要等级', defaultVisible: false },
       { key: 'filePath', label: '本地文件', defaultVisible: false },
       { key: 'source', label: '来源', defaultVisible: false },
+      { key: 'isComplete', label: '完整性', defaultVisible: true },
       { key: 'remark', label: '备注', defaultVisible: true },
     ];
 

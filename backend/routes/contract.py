@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from flask import Blueprint, request, jsonify, g
 
 from database.db import get_db
-from database.db import utc_to_beijing
+from database.db import utc_to_beijing, host_file_path
 from services.log_service import write_log
 from middleware.auth_middleware import login_required, admin_required
 
@@ -28,6 +28,15 @@ def _calc_status(end_date: str) -> str:
 
 
 def _row_to_dict(r) -> dict:
+    # 计算 isComplete：手动录入始终完整，扫描导入动态检查必填字段
+    if 'source' in r.keys() and r['source'] == 'scan':
+        is_complete = bool(
+            r['name'] and r['category'] and r['company'] and r['agent']
+            and r['start_date'] and r['end_date']
+        )
+    else:
+        is_complete = True
+
     return {
         'id': r['id'],
         'name': r['name'],
@@ -41,12 +50,15 @@ def _row_to_dict(r) -> dict:
         'endDate': str(r['end_date']),
         'status': r['status'],
         'filePath': r['file_path'] or '',
+        'fileName': r['file_name'] if 'file_name' in r.keys() else '',
+        'hostFilePath': host_file_path(r['file_path'] or ''),
         'remark': r['remark'] or '',
         'createdAt': utc_to_beijing(str(r['created_at'])),
         'updatedAt': utc_to_beijing(str(r['updated_at'])),
         'source': r['source'] if 'source' in r.keys() else 'manual',
         'emailReminder': bool(r['email_reminder']) if 'email_reminder' in r.keys() else True,
         'priority': r['priority'] if 'priority' in r.keys() else '普通',
+        'isComplete': is_complete,
     }
 
 
@@ -75,9 +87,21 @@ def list_contracts():
 
     where_sql = (' AND '.join(where)) if where else '1=1'
 
+    # 排序（白名单防注入）
+    sort_by = request.args.get('sortBy', 'created_at').strip()
+    sort_order = request.args.get('sortOrder', 'desc').strip()
+    SORT_WHITELIST = {
+        'end_date': 'end_date',
+        'name': 'name',
+        'priority': "CASE priority WHEN '重要' THEN 0 WHEN '普通' THEN 1 WHEN '不重要' THEN 2 END",
+        'created_at': 'created_at',
+    }
+    order_col = SORT_WHITELIST.get(sort_by, 'created_at')
+    order_dir = 'DESC' if sort_order.lower() == 'desc' else 'ASC'
+
     total = db.execute(f"SELECT COUNT(*) FROM contracts WHERE {where_sql}", params).fetchone()[0]
     rows = db.execute(
-        f"SELECT * FROM contracts WHERE {where_sql} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        f"SELECT * FROM contracts WHERE {where_sql} ORDER BY {order_col} {order_dir} LIMIT ? OFFSET ?",
         params + [page_size, (page - 1) * page_size]
     ).fetchall()
 

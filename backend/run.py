@@ -19,8 +19,9 @@ try:
     from services.scheduler_service import init_scheduler, shutdown_scheduler
     init_scheduler(app)
     atexit.register(shutdown_scheduler)
-except Exception:
-    pass  # APScheduler not installed or startup failed; manual test email still works
+except Exception as e:
+    import logging
+    logging.getLogger(__name__).warning("Email scheduler not started: %s", e)
 
 if __name__ == '__main__':
     host = app.config.get('SERVER_HOST', '0.0.0.0')

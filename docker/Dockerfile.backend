@@ -1,9 +1,9 @@
 # ============================================================
 #  Suzhen Management System - Backend Dockerfile
-#  Based on python:3.11-slim, using gunicorn to run Flask
-#  Using Aliyun pip mirror for acceleration
+#  Python version configurable via PYTHON_VERSION build arg
 # ============================================================
-FROM python:3.11-slim
+ARG PYTHON_VERSION=3
+FROM python:${PYTHON_VERSION}-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1

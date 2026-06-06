@@ -30,10 +30,12 @@ CREATE TABLE IF NOT EXISTS contracts (
     end_date DATE NOT NULL,
     status TEXT DEFAULT 'active',
     file_path TEXT DEFAULT '',
+    file_name TEXT DEFAULT '',
     remark TEXT DEFAULT '',
     source TEXT DEFAULT 'manual',
     email_reminder INTEGER DEFAULT 1,
     priority TEXT DEFAULT '普通',
+    is_complete INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -50,10 +52,12 @@ CREATE TABLE IF NOT EXISTS patents (
     expire_date DATE NOT NULL,
     status TEXT DEFAULT 'active',
     file_path TEXT DEFAULT '',
+    file_name TEXT DEFAULT '',
     remark TEXT DEFAULT '',
     source TEXT DEFAULT 'manual',
     email_reminder INTEGER DEFAULT 1,
     priority TEXT DEFAULT '普通',
+    is_complete INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -71,10 +75,12 @@ CREATE TABLE IF NOT EXISTS insurances (
     end_date DATE NOT NULL,
     status TEXT DEFAULT 'active',
     file_path TEXT DEFAULT '',
+    file_name TEXT DEFAULT '',
     remark TEXT DEFAULT '',
     source TEXT DEFAULT 'manual',
     email_reminder INTEGER DEFAULT 1,
     priority TEXT DEFAULT '普通',
+    is_complete INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

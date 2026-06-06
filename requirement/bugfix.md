@@ -249,3 +249,70 @@ onclick="API.download('/files/${f.id}/download', '${f.name.replace(/'/g, "\\'")}
 - `frontend/pages/contract.html`
 - `frontend/pages/patent.html`
 - `frontend/pages/insurance.html`
+
+---
+
+### Fix 14: Hardcoded Python Version in Dockerfile Breaks Cross-Machine Build
+
+**Symptom**: `docker compose up -d --build` fails on a different computer with `docker.io/library/python:3.11-slim: not found`. Also, compose `version` attribute is obsolete and produces warnings.
+
+**Root Cause**: 
+1. `docker/Dockerfile.backend` had `FROM python:3.11-slim` hardcoded — if Docker Hub can't resolve that specific tag on a different machine (network/mirror issues), build fails.
+2. `docker/docker-compose.yaml` and `build/docker-compose.yaml` had `version: "3.9"` which Docker Compose v2+ ignores and warns about.
+
+**Fix**: 
+- Changed `FROM python:3.11-slim` to `ARG PYTHON_VERSION=3.11` + `FROM python:${PYTHON_VERSION}-slim`, allowing override via `PYTHON_VERSION` build arg
+- Added `args: - PYTHON_VERSION=${PYTHON_VERSION:-3.11}` in compose backend build section
+- Removed `version: "3.9"` from both compose files
+
+**Files Changed**:
+- `docker/Dockerfile.backend`
+- `docker/docker-compose.yaml`
+- `build/docker-compose.yaml`
+- `CLAUDE.md` (updated description)
+
+---
+
+### Fix 15: Scan Blueprint Missing url_prefix — Backend Crash on Startup
+
+**Symptom**: Backend fails to start with `ValueError: URL rule '' must start with a slash.`
+
+**Root Cause**: `backend/routes/__init__.py` registered `scan_bp` without a `url_prefix`, while the scan routes defined `''` and `/api/scan/import` as route paths. Flask requires all routes to start with `/`, so the empty string route caused a startup crash.
+
+**Fix**:
+- Added `url_prefix='/api/scan'` to scan blueprint registration in `__init__.py`
+- Fixed `/api/scan/import` route to `/import` (removed redundant prefix)
+- Fixed `/api/scan/import-dirs` route to `/import-dirs` (removed redundant prefix)
+
+**Files Changed**:
+- `backend/routes/__init__.py`
+- `backend/routes/scan.py`
+
+---
+
+### Fix 16: Old bulk_import Missing file_name Field
+
+**Symptom**: The old `POST /api/scan/import` endpoint (single-level file import) did not save `file_name` to the database, only `file_path`. Records imported via this route would have empty `file_name`.
+
+**Root Cause**: The INSERT statements in `bulk_import()` were never updated when the `file_name` column was added to the schema.
+
+**Fix**: Added `file_name` to all three INSERT statements in `bulk_import()` (contract/patent/insurance).
+
+**Files Changed**:
+- `backend/routes/scan.py`
+
+---
+
+### Fix 17: Scan Dedup Only Matched file_path (Not file_name)
+
+**Symptom**: If a file was moved to a different directory (e.g., `/data/合同/合同.pdf` → `/data/归档/合同.pdf`), the scan feature would treat it as a new file and create a duplicate record. The `file_path` changed but the `file_name` (原始文件名) stayed the same.
+
+**Root Cause**: Both `scan_directory()` and `import_directories()` only used `file_path` for deduplication. The `file_name` field was stored but never used for matching.
+
+**Fix**: 
+- `scan_directory()`: Query both `file_path` and `file_name` from DB; a file is considered "existing" if either `file_path` OR `file_name` matches
+- `import_directories()`: Same dual-set matching; after import, both `file_path` and `file_name` are added to their respective sets to prevent intra-batch duplicates
+- `bulk_import()`: SQL WHERE changed from `file_path = ?` to `file_path = ? OR (file_name != '' AND file_name = ?)`
+
+**Files Changed**:
+- `backend/routes/scan.py`

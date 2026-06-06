@@ -6,16 +6,24 @@ from flask import request, g, jsonify
 from services.auth_service import verify_token
 
 
+def _get_token():
+    """从 Authorization header 或 query param 中提取 token"""
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        return auth_header[7:]
+    # <a> 标签下载无法设置 header，从 query param 获取
+    return request.args.get('token', '')
+
+
 def login_required(f):
     """装饰器：要求请求携带有效的 JWT token"""
 
     @wraps(f)
     def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
+        token = _get_token()
+        if not token:
             return jsonify({'success': False, 'message': '未提供认证令牌'}), 401
 
-        token = auth_header[7:]
         payload = verify_token(token)
         if payload is None:
             return jsonify({'success': False, 'message': '令牌无效或已过期，请重新登录'}), 401

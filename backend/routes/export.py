@@ -1,5 +1,5 @@
 """
-数据导出 API — 生成 .xlsx 文件保存到 /data/exports/
+数据导出 API — 生成 .xlsx 文件保存到 downloads 目录
 """
 import os
 
@@ -11,13 +11,34 @@ from middleware.auth_middleware import login_required
 
 export_bp = Blueprint('export', __name__)
 
-# 导出文件保存目录（Docker 内为 /data/exports/，本地开发为 backend/exports/）
-def _export_dir():
+
+def _data_root():
+    """数据根目录：Docker 容器内为 /data，本地通过 HOST_DATA_DIR 或项目根目录推算"""
     import flask
-    db_path = flask.current_app.config.get('DATABASE_PATH', 'backend/database/suzhen.db')
+    db_path = flask.current_app.config.get('DATABASE_PATH', '')
     if db_path.startswith('/data/'):
-        return '/data/exports'
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'exports')
+        return '/data'
+    host_dir = flask.current_app.config.get('HOST_DATA_DIR', '')
+    if host_dir:
+        return host_dir
+    # 本地开发：项目根目录/data
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'data')
+
+
+def _download_dir():
+    return os.path.join(_data_root(), 'download')
+
+
+def _host_path(filepath):
+    """容器内 Linux 路径 → 宿主机 Windows 路径，用于前端展示"""
+    import flask
+    host_data_dir = flask.current_app.config.get('HOST_DATA_DIR', '')
+    db_path = flask.current_app.config.get('DATABASE_PATH', '')
+    # Docker 环境：/data/download/xxx.xlsx → HOST_DATA_DIR\download\xxx.xlsx
+    if db_path.startswith('/data/') and host_data_dir:
+        rel = filepath[len('/data/'):] if filepath.startswith('/data/') else filepath
+        return host_data_dir.rstrip('\\') + '\\' + rel.replace('/', '\\')
+    return filepath
 
 
 @export_bp.route('', methods=['POST'])
@@ -29,13 +50,57 @@ def export_data():
 
     db = get_db()
 
+    # 中文列名映射
+    CONTRACT_HEADERS = {
+        'name': '合同名称', 'category': '类别', 'company': '合同公司',
+        'contact_person': '联系人', 'contact_phone': '联系电话', 'contact_email': '联系邮箱',
+        'agent': '对接业务员', 'start_date': '开始日期', 'end_date': '到期日期',
+        'status': '状态', 'file_path': '本地文件', 'remark': '备注',
+        'source': '来源', 'email_reminder': '邮件提醒', 'priority': '重要等级',
+        'created_at': '创建时间', 'updated_at': '更新时间',
+    }
+    PATENT_HEADERS = {
+        'name': '专利名称', 'patent_no': '专利号', 'type': '类型',
+        'holder': '权利人', 'agent': '对接业务员',
+        'application_date': '申请日期', 'expire_date': '到期日期',
+        'status': '状态', 'file_path': '本地文件', 'remark': '备注',
+        'source': '来源', 'email_reminder': '邮件提醒', 'priority': '重要等级',
+        'created_at': '创建时间', 'updated_at': '更新时间',
+    }
+    INSURANCE_HEADERS = {
+        'plate_no': '车牌号', 'brand': '品牌型号', 'insurance_company': '保险公司',
+        'insurance_type': '险种', 'amount': '保费金额', 'agent': '对接业务员',
+        'start_date': '开始日期', 'end_date': '到期日期',
+        'status': '状态', 'file_path': '本地文件', 'remark': '备注',
+        'source': '来源', 'email_reminder': '邮件提醒', 'priority': '重要等级',
+        'created_at': '创建时间', 'updated_at': '更新时间',
+    }
+
+    def _value_map(row, headers):
+        """将数据库行转为 {中文列名: 值}"""
+        result = {}
+        for col, cn_name in headers.items():
+            val = row.get(col, '')
+            if val is None:
+                val = ''
+            # 翻译特殊字段
+            if col == 'email_reminder':
+                val = '是' if val else '否'
+            elif col == 'source':
+                val = '扫描导入' if val == 'scan' else '手动录入'
+            result[cn_name] = val
+        return result
+
     # 构建查询
-    def _query(table, create_filter='', exp_filter=''):
+    def _query(table, headers, create_filter='', exp_filter=''):
+        cols = ', '.join(headers.keys())
         if export_type == 'byCreate' and create_filter:
-            return [dict(r) for r in db.execute(f"SELECT * FROM {table} {create_filter}", _params('create')).fetchall()]
-        if export_type == 'byExpire' and exp_filter:
-            return [dict(r) for r in db.execute(f"SELECT * FROM {table} {exp_filter}", _params('expire')).fetchall()]
-        return [dict(r) for r in db.execute(f"SELECT * FROM {table}").fetchall()]
+            rows = db.execute(f"SELECT {cols} FROM {table} {create_filter}", _params('create')).fetchall()
+        elif export_type == 'byExpire' and exp_filter:
+            rows = db.execute(f"SELECT {cols} FROM {table} {exp_filter}", _params('expire')).fetchall()
+        else:
+            rows = db.execute(f"SELECT {cols} FROM {table}").fetchall()
+        return [_value_map(dict(r), headers) for r in rows]
 
     def _params(kind):
         if kind == 'create':
@@ -52,9 +117,9 @@ def export_data():
     expire_patent = "WHERE expire_date >= ? AND expire_date <= ?" if export_type == 'byExpire' else ''
     expire_insurance = "WHERE end_date >= ? AND end_date <= ?" if export_type == 'byExpire' else ''
 
-    contracts = _query('contracts', create_where, expire_contract)
-    patents = _query('patents', create_where, expire_patent)
-    insurances = _query('insurances', create_where, expire_insurance)
+    contracts = _query('contracts', CONTRACT_HEADERS, create_where, expire_contract)
+    patents = _query('patents', PATENT_HEADERS, create_where, expire_patent)
+    insurances = _query('insurances', INSURANCE_HEADERS, create_where, expire_insurance)
 
     # JSON 导出（保留兼容）
     if format_type == 'json':
@@ -131,13 +196,15 @@ def export_data():
     ws3 = wb.create_sheet('车险数据')
     _write_sheet(ws3, insurances, '车险数据')
 
-    # 保存文件
-    export_dir = _export_dir()
+    # 保存文件到 downloads 目录
+    export_dir = _download_dir()
     os.makedirs(export_dir, exist_ok=True)
     timestamp = beijing_now().replace(':', '-').replace(' ', '_')
     filename = f'export_{timestamp}.xlsx'
     filepath = os.path.join(export_dir, filename)
     wb.save(filepath)
+
+    host_path = _host_path(filepath)
 
     write_log(action='导出数据', module='数据导出',
               detail=f'Excel导出: {filename} (合同{len(contracts)}条, 专利{len(patents)}条, 车险{len(insurances)}条)',
@@ -147,7 +214,7 @@ def export_data():
         'success': True,
         'data': {
             'filename': filename,
-            'filepath': filepath,
+            'filepath': host_path,
             'exportInfo': {
                 'type': export_type,
                 'exportedAt': beijing_now(),
@@ -157,5 +224,5 @@ def export_data():
                 'totalInsurances': len(insurances),
             }
         },
-        'message': f'导出成功！文件已保存: {filepath}'
+        'message': f'导出成功！文件已保存至: {host_path}'
     })

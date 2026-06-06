@@ -106,16 +106,18 @@ echo.
 echo   To improve Docker image download speed, configure a mirror accelerator:
 echo.
 echo   Recommended sources:
-echo     [1] Alibaba Cloud Mirror (fast, recommended)
+echo     [1] DaoCloud Mirror (recommended)
 echo     [2] 1ms.run Mirror
-echo     [3] Skip, use default (may be slow)
+echo     [3] Alibaba Cloud Mirror
+echo     [4] Skip, use default (may be slow)
 echo.
-set /p MIRROR_CHOICE="   Please select (1/2/3, default 1): "
+set /p MIRROR_CHOICE="   Please select (1/2/3/4, default 1): "
 if "!MIRROR_CHOICE!"=="" set MIRROR_CHOICE=1
 
-if "!MIRROR_CHOICE!"=="1" set MIRROR_URL=https://registry.cn-hangzhou.aliyuncs.com
+if "!MIRROR_CHOICE!"=="1" set MIRROR_URL=https://www.daocloud.io/mirror
 if "!MIRROR_CHOICE!"=="2" set MIRROR_URL=https://docker.1ms.run
-if "!MIRROR_CHOICE!"=="3" goto :skip_mirror
+if "!MIRROR_CHOICE!"=="3" set MIRROR_URL=https://registry.cn-hangzhou.aliyuncs.com
+if "!MIRROR_CHOICE!"=="4" goto :skip_mirror
 
 echo.
 echo   Setting Docker mirror source: !MIRROR_URL!

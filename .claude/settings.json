@@ -6,8 +6,7 @@
       "Bash(.venv/Scripts/python.exe -c ':*)",
       "Bash(where python:*)",
       "Bash(python -c \"import sys; print\\(sys.executable\\); print\\(sys.path\\)\")",
-      "Bash(\"E:/Tools/python/Python-3.11/python.exe\" -c \"import flask; print\\('flask OK'\\)\")",
-      "Bash(E:/Tools/python/Python-3.11/python.exe -c ':*)",
+      "Bash(.venv/Scripts/python.exe -c \"import flask; print\\('flask OK'\\)\")",
       "Bash(\".venv/Scripts/python.exe\" test_smtp.py)",
       "Bash(curl -s http://localhost:5000/api/auth/me)",
       "Bash(.venv/Scripts/python.exe test_full.py)",
@@ -19,7 +18,13 @@
       "Bash(cmd.exe /c \"e:\\\\GitProject\\\\Private\\\\suzhenManagementSystem\\\\build.bat\")",
       "Bash(docker compose:*)",
       "Bash(where docker:*)",
-      "Bash(docker --version)"
+      "Bash(docker --version)",
+      "Bash(.venv/Scripts/pip install:*)",
+      "Bash(.venv/Scripts/python.exe test_suite.py)",
+      "Bash(curl -s -X PUT http://localhost:5000/api/contracts/batch -H \"Content-Type: application/json\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJ1c2VybmFtZSI6ImFkbWluIiwicm9sZSI6Ilx1N2JhMVx1NzQwNlx1NTQ1OCIsImV4cCI6MTc4MDQ0OTM1MiwiaWF0IjoxNzgwMzYyOTUyfQ.PuG-2BKVMa30roLuxDrvt26k0LDla4ZwyWyOWfx88lE\" -d \"{\\\\\"ids\\\\\":[],\\\\\"field\\\\\":\\\\\"email_reminder\\\\\",\\\\\"value\\\\\":1}\")",
+      "Bash(taskkill //F //IM python.exe)",
+      "Bash(python3 -c 'import re; t=open\\('\\\\''__TRACKED_VAR__'\\\\'',encoding='\\\\''utf-8'\\\\'',errors='\\\\''ignore'\\\\''\\).read\\(\\); m=re.findall\\(r'\\\\''[\\\\u4e00-\\\\u9fff]+'\\\\'',t\\); print\\('\\\\''Chinese chars found:'\\\\'', m if m else '\\\\''NONE'\\\\''\\)')",
+      "Bash(.venv/Scripts/python.exe -c 'import re; t=open\\('\\\\''__TRACKED_VAR__'\\\\'',encoding='\\\\''utf-8'\\\\'',errors='\\\\''ignore'\\\\''\\).read\\(\\); m=re.findall\\(r'\\\\''[\\\\u4e00-\\\\u9fff]+'\\\\'',t\\); print\\('\\\\''Chinese chars found:'\\\\'', m if m else '\\\\''NONE'\\\\''\\)')"
     ]
   }
 }

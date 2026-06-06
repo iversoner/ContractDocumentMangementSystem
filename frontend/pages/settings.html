@@ -68,8 +68,7 @@
           <span class="help-tip">?
             <span class="help-tip-text">系统通过 SMTP 协议发送邮件通知。
 发件人即「发送账号」填的邮箱地址。
-• 163邮箱: smtp.163.com 端口465/587
-• QQ邮箱: smtp.qq.com 端口465/587
+默认163邮箱 smtp.163.com:465（SSL），也可用QQ邮箱 smtp.qq.com:587（TLS）。
 发送密码需要去邮箱设置里获取【授权码】，不是登录密码。</span>
           </span>
         </h3>
@@ -87,23 +86,21 @@
 QQ邮箱: smtp.qq.com</span>
             </span>
           </label>
-          <input type="text" class="form-control" id="smtpServer" value="smtp.example.com">
+          <input type="text" class="form-control" id="smtpServer" value="smtp.163.com">
         </div>
         <div class="form-group">
           <label>SMTP 端口
             <span class="help-tip">?
-              <span class="help-tip-text">163邮箱: 465 或 587
-QQ邮箱: 465 或 587
-勾选TLS用587，不勾选用465</span>
+              <span class="help-tip-text">163邮箱SSL用465，QQ邮箱TLS用587</span>
             </span>
           </label>
-          <input type="number" class="form-control" id="smtpPort" value="587">
+          <input type="number" class="form-control" id="smtpPort" value="465">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>发送账号</label>
-          <input type="email" class="form-control" id="smtpUser" value="notify@suzhen.com">
+          <input type="email" class="form-control" id="smtpUser" value="" placeholder="your-email@163.com">
         </div>
         <div class="form-group">
           <label>发送密码
@@ -125,7 +122,7 @@ QQ邮箱: 465 或 587
         </div>
         <div class="form-group" style="display: flex; align-items: flex-end;">
           <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-            <input type="checkbox" id="useTLS" checked> 使用 TLS 加密
+            <input type="checkbox" id="useTLS"> 使用 TLS 加密
           </label>
         </div>
       </div>
@@ -149,34 +146,13 @@ QQ邮箱: 465 或 587
       <div class="form-row">
         <div class="form-group">
           <label>提醒接收邮箱</label>
-          <input type="text" class="form-control" id="remindRecipients" value="admin@suzhen.com" placeholder="多个邮箱用逗号分隔">
+          <input type="text" class="form-control" id="remindRecipients" value="" placeholder="your-email@163.com（多个用逗号分隔）">
         </div>
         <div class="form-group" style="display: flex; align-items: flex-end;">
           <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
             <input type="checkbox" id="remindEnabled" checked> 启用到期提醒
           </label>
         </div>
-      </div>
-    </div>
-
-    <!-- 存储配置 -->
-    <div class="card">
-      <div class="card-header">
-        <h3>💾 文件存储配置</h3>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>上传文件夹路径</label>
-          <input type="text" class="form-control" id="uploadFolder" value="/data/uploads">
-        </div>
-        <div class="form-group">
-          <label>最大文件大小 (MB)</label>
-          <input type="number" class="form-control" id="maxFileSize" value="10" min="1" max="100">
-        </div>
-      </div>
-      <div class="form-group">
-        <label>允许的文件类型</label>
-        <input type="text" class="form-control" id="allowedTypes" value=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png">
       </div>
     </div>
 
@@ -248,8 +224,21 @@ QQ邮箱: 465 或 587
           senderName: document.getElementById('senderName').value,
         }
       };
-      try { const res = await API.post('/settings/test-email', body); alert(res.message); }
-      catch (err) { alert('测试失败: ' + err.message); }
+      try {
+        const res = await API.post('/settings/test-email', body);
+        showBlueDialog('testEmailDlg', {
+          icon: '✅', title: '测试邮件',
+          body: '<p style="text-align:center;font-size:14px;">' + res.message + '</p>',
+          footer: '<button class="btn btn-primary" onclick="closeBlueDialog(\'testEmailDlg\')" style="min-width:100px;">确定</button>'
+        });
+      }
+      catch (err) {
+        showBlueDialog('testEmailDlg', {
+          icon: '❌', title: '测试失败',
+          body: '<p style="text-align:center;color:#ff4d4f;">' + err.message + '</p>',
+          footer: '<button class="btn btn-outline" onclick="closeBlueDialog(\'testEmailDlg\')">关闭</button>'
+        });
+      }
     }
 
     async function saveSettings() {
@@ -267,11 +256,6 @@ QQ邮箱: 465 或 587
           backupEnabled: document.getElementById('backupEnabled').checked,
           backupInterval: document.getElementById('backupInterval').value,
         },
-        storage: {
-          uploadFolder: document.getElementById('uploadFolder').value,
-          maxFileSize: parseInt(document.getElementById('maxFileSize').value) * 1024 * 1024 || 10485760,
-          allowedTypes: document.getElementById('allowedTypes').value,
-        },
         reminder: {
           enabled: document.getElementById('remindEnabled').checked,
           daysBefore: parseInt(document.getElementById('daysBefore').value) || 30,
@@ -279,8 +263,22 @@ QQ邮箱: 465 或 587
           recipients: document.getElementById('remindRecipients').value,
         },
       };
-      try { await API.put('/settings', body); alert('配置已保存'); dirty = false; }
-      catch (err) { alert('保存失败: ' + err.message); }
+      try {
+        const res = await API.put('/settings', body);
+        showBlueDialog('saveSettingsDlg', {
+          icon: '✅', title: '配置已保存',
+          body: '<p style="text-align:center;font-size:14px;color:#333;">系统配置已成功保存。</p>',
+          footer: '<button class="btn btn-primary" onclick="closeBlueDialog(\'saveSettingsDlg\')" style="min-width:100px;">确定</button>'
+        });
+        dirty = false;
+      }
+      catch (err) {
+        showBlueDialog('saveSettingsDlg', {
+          icon: '❌', title: '保存失败',
+          body: '<p style="text-align:center;color:#ff4d4f;">' + err.message + '</p>',
+          footer: '<button class="btn btn-outline" onclick="closeBlueDialog(\'saveSettingsDlg\')">关闭</button>'
+        });
+      }
     }
 
     // 监听表单变化
@@ -306,17 +304,14 @@ QQ邮箱: 465 或 587
         const res = await API.get('/settings');
         const s = res.data;
         document.getElementById('smtpServer').value = s.email.smtpServer || '';
-        document.getElementById('smtpPort').value = s.email.smtpPort || 587;
+        document.getElementById('smtpPort').value = s.email.smtpPort || 465;
         document.getElementById('smtpUser').value = s.email.username || '';
         document.getElementById('smtpPass').value = s.email.password || '';
         document.getElementById('senderName').value = s.email.senderName || '';
-        document.getElementById('useTLS').checked = s.email.useTLS !== false;
+        document.getElementById('useTLS').checked = s.email.useTLS === true;
         document.getElementById('dbPath').value = s.database.path || '';
         document.getElementById('backupEnabled').checked = s.database.backupEnabled || false;
         document.getElementById('backupInterval').value = s.database.backupInterval || 'daily';
-        document.getElementById('uploadFolder').value = s.storage.uploadFolder || '';
-        document.getElementById('maxFileSize').value = (s.storage.maxFileSize || 10485760) / (1024 * 1024);
-        document.getElementById('allowedTypes').value = s.storage.allowedTypes || '';
         document.getElementById('daysBefore').value = s.reminder.daysBefore || 30;
         document.getElementById('sendTime').value = s.reminder.sendTime || '09:00';
         document.getElementById('remindRecipients').value = s.reminder.recipients || '';

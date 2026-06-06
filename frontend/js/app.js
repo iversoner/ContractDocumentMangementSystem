@@ -101,14 +101,23 @@ const API = {
 
   download(path, filename) {
     const url = API_BASE + path;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename || '';
-    // 携带 token 用于鉴权（通过查询参数，因为 a 标签不能设置 header）
-    link.href = url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(Session.token);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const sep = url.includes('?') ? '&' : '?';
+    const downloadUrl = url + sep + 'token=' + encodeURIComponent(Session.token);
+    fetch(downloadUrl)
+      .then(res => {
+        if (!res.ok) throw new Error('下载失败');
+        return res.blob();
+      })
+      .then(blob => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename || '';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+      })
+      .catch(err => showToast('下载失败: ' + err.message, 'error'));
   },
 };
 
@@ -245,6 +254,103 @@ function closeModal(modalId) {
 }
 
 // ============================================================
+// 统一弹窗方法（屏幕中央，蓝色主题）
+// ============================================================
+
+/**
+ * 显示蓝色主题弹窗
+ * @param {string} id - 弹窗唯一ID，用于关闭
+ * @param {object} opts - { icon, title, body, footer, width }
+ *   icon: 顶部图标（如 '⏳' '✅' '❌' '📋'），可选
+ *   title: 标题文字
+ *   body: HTML 字符串
+ *   footer: HTML 字符串（默认 "确定" 按钮）
+ *   width: 弹窗宽度（默认 460px）
+ *   closable: 是否可点遮罩关闭（默认 false）
+ */
+function showBlueDialog(id, opts) {
+  opts = opts || {};
+  closeBlueDialog(id);
+
+  var backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop show';
+  backdrop.id = id;
+  backdrop.style.zIndex = '9999';
+  if (opts.closable) {
+    backdrop.onclick = function(e) { if (e.target === backdrop) closeBlueDialog(id); };
+  }
+
+  var w = opts.width || '460px';
+  var box = document.createElement('div');
+  box.style.cssText = 'background:#fff;border-radius:12px;box-shadow:0 8px 40px rgba(24,144,255,0.2);width:90%;max-width:' + w + ';padding:0;overflow:hidden;';
+
+  // Header
+  var header = document.createElement('div');
+  header.style.cssText = 'background:linear-gradient(135deg,#1890ff,#096dd9);color:#fff;padding:20px 24px;text-align:center;';
+  var iconHtml = opts.icon ? '<div style="font-size:36px;margin-bottom:8px;">' + opts.icon + '</div>' : '';
+  header.innerHTML = iconHtml + '<h3 style="margin:0;font-weight:600;">' + (opts.title || '') + '</h3>';
+  box.appendChild(header);
+
+  // Body
+  var body = document.createElement('div');
+  body.style.cssText = 'padding:24px;';
+  body.innerHTML = opts.body || '';
+  box.appendChild(body);
+
+  // Footer
+  var footer = document.createElement('div');
+  footer.style.cssText = 'padding:16px 24px;border-top:1px solid #f0f0f0;text-align:right;';
+  footer.innerHTML = opts.footer || '<button class="btn btn-primary" onclick="closeBlueDialog(\'' + id + '\')" style="min-width:100px;">确定</button>';
+  box.appendChild(footer);
+
+  backdrop.appendChild(box);
+  document.body.appendChild(backdrop);
+}
+
+function closeBlueDialog(id) {
+  var el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+/** 显示文件路径弹窗 */
+function showFilePathDialog(filePath) {
+  showBlueDialog('filePathDlg', {
+    icon: '📁', title: '文件路径',
+    body: '<div style="background:#f5f5f5;border-radius:6px;padding:16px;text-align:center;word-break:break-all;font-family:Consolas,monospace;font-size:13px;color:#333;">' + (filePath||'无').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' +
+      '<p style="margin-top:12px;font-size:12px;color:#999;text-align:center;">请在文件管理器中打开上述路径查看文件</p>',
+    footer: '<button class="btn btn-primary" onclick="closeBlueDialog(\'filePathDlg\')" style="min-width:100px;">确定</button>'
+  });
+}
+
+// Spinner animation
+(function() {
+  if (document.getElementById('_blueDialogSpin')) return;
+  var s = document.createElement('style');
+  s.id = '_blueDialogSpin';
+  s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+  document.head.appendChild(s);
+})();
+
+// Sortable table header styles
+(function() {
+  if (document.getElementById('_sortableThStyle')) return;
+  var s = document.createElement('style');
+  s.id = '_sortableThStyle';
+  s.textContent = '.sortable-th { cursor: pointer; user-select: none; white-space: nowrap; } .sortable-th:hover { background: #f0f5ff; } .sort-icon { font-size: 11px; margin-left: 2px; color: #ccc; }';
+  document.head.appendChild(s);
+})();
+
+// ============================================================
+// 信息完整性
+// ============================================================
+function getIsCompleteBadge(isComplete) {
+  if (isComplete) {
+    return '<span style="color:var(--success); cursor:default;" title="信息完整">✅ 完整</span>';
+  }
+  return '<span style="color:var(--warning); cursor:default;" title="信息不完整，请补充必填字段">⚠️ 不完整</span>';
+}
+
+// ============================================================
 // 登录逻辑 (对接后端 API)
 // ============================================================
 
@@ -332,210 +438,208 @@ document.addEventListener('DOMContentLoaded', () => {
 // 文件扫描助手（共享逻辑，供 contract/patent/insurance 页面使用）
 // ============================================================
 const ScanHelper = {
-  // 当前扫描状态
   _state: {
-    newFiles: [],
-    currentDir: '',
-    parentDir: null,
     subdirs: [],
-    existingCount: 0,
-    total: 0,
+    checkedDirs: new Set(),
+    loading: false,
   },
 
   _module: '',
   _onImportComplete: null,
   _categoryProvider: null,
 
-  /**
-   * 初始化：设置模块名和回调
-   * @param {string} module - 'contract' | 'patent' | 'insurance'
-   * @param {Function} onImportComplete - 导入完成后的回调（刷新表格）
-   * @param {Function} categoryProvider - 可选，返回分类字符串的函数（仅合同需要）
-   */
   init(module, onImportComplete, categoryProvider) {
     this._module = module;
     this._onImportComplete = onImportComplete;
     this._categoryProvider = categoryProvider || null;
   },
 
-  /** 打开同步模态框并重置状态 */
-  openModal() {
-    const dirInput = document.getElementById('syncDirectory');
-    if (dirInput) dirInput.value = '';
-    const resultDiv = document.getElementById('syncResult');
-    if (resultDiv) resultDiv.innerHTML = '';
-    const importBtn = document.getElementById('syncImportBtn');
-    if (importBtn) importBtn.style.display = 'none';
-    this._state = { newFiles: [], currentDir: '', parentDir: null, subdirs: [], existingCount: 0, total: 0 };
+  /** 打开同步模态框并自动扫描 /data */
+  async openModal() {
     openModal('syncModal');
+    this._state = { subdirs: [], checkedDirs: new Set(), loading: true };
+    this._renderTree([], true);
+    await this._scan('/data');
   },
 
   /** 扫描目录 */
-  async scanDirectory(dirOverride) {
-    const dir = dirOverride || document.getElementById('syncDirectory').value.trim();
-    if (!dir) { showToast('请输入目录路径', 'error'); return; }
-
-    const btn = document.getElementById('syncScanBtn');
-    btn.disabled = true;
-    btn.textContent = '扫描中...';
-
+  async _scan(dir) {
     try {
       const res = await API.post('/scan', { directory: dir, module: this._module });
       const d = res.data;
-
-      this._state.newFiles = d.newFiles;
-      this._state.currentDir = d.currentDir || d.directory;
-      this._state.parentDir = d.parentDir;
-      this._state.subdirs = d.subdirs || [];
-      this._state.existingCount = d.existingCount;
-      this._state.total = d.total;
-
-      this._renderResult(d);
+      this._state.subdirs = d.subdirs;
+      this._state.loading = false;
+      this._renderTree(d.subdirs, false, d.currentDir, d.parentDir, d.newCount);
     } catch (err) {
+      this._state.loading = false;
+      this._renderTree([], false);
       showToast('扫描失败: ' + err.message, 'error');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '🔍 扫描';
     }
   },
 
-  /** 导航到子目录 */
-  navigateToSubdir(subdirName) {
-    const newPath = this._state.currentDir + '/' + subdirName;
-    document.getElementById('syncDirectory').value = newPath;
-    this.scanDirectory(newPath);
+  /** 进入子目录 */
+  enterDir(dirPath) {
+    this._state.loading = true;
+    this._state.subdirs = [];
+    this._renderTree([], true);
+    this._scan(dirPath);
   },
 
-  /** 返回上级目录 */
-  navigateUp() {
-    if (this._state.parentDir) {
-      document.getElementById('syncDirectory').value = this._state.parentDir;
-      this.scanDirectory(this._state.parentDir);
+  /** 返回上级 */
+  goUp() {
+    const parent = document.getElementById('syncCurrentDir').getAttribute('data-parent');
+    if (parent) {
+      this._state.loading = true;
+      this._state.subdirs = [];
+      this._renderTree([], true);
+      this._scan(parent);
     }
   },
 
-  /** 渲染扫描结果 */
-  _renderResult(d) {
+  /** 返回根目录 /data */
+  goRoot() {
+    this._state.loading = true;
+    this._state.subdirs = [];
+    this._renderTree([], true);
+    this._scan('/data');
+  },
+
+  /** 渲染目录树 */
+  _renderTree(subdirs, loading, currentDir, parentDir, rootNewCount) {
     const container = document.getElementById('syncResult');
+    if (!container) return;
+
+    // 更新当前目录信息
+    const dirInfo = document.getElementById('syncCurrentDir');
+    if (dirInfo && currentDir) {
+      dirInfo.textContent = currentDir;
+      dirInfo.setAttribute('data-parent', parentDir || '');
+    }
+    if (dirInfo && rootNewCount !== undefined) {
+      document.getElementById('syncNewBadge').textContent = rootNewCount;
+      document.getElementById('syncNewBadge').style.display = rootNewCount > 0 ? '' : 'none';
+    }
+
+    if (loading) {
+      container.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px;">⏳ 正在扫描目录...</p>';
+      return;
+    }
+
     let html = '';
 
-    // ---- 面包屑导航 ----
-    html += '<div style="margin-bottom:10px; font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:2px; flex-wrap:wrap;">';
-    html += '<span>📍 </span>';
-    const curDir = d.currentDir || d.directory;
-    const parts = curDir.split('/').filter(function(p) { return p; });
-    const clickableParts = [];
-    for (var i = 0; i < parts.length; i++) {
-      clickableParts.push(parts.slice(0, i + 1).join('/'));
-    }
-    html += '<a href="javascript:void(0)" onclick="ScanHelper._breadcrumbClick(\'/\')" style="color:var(--primary); text-decoration:none;">/</a>';
-    for (var j = 0; j < parts.length; j++) {
-      html += '<span style="color:var(--text-muted);">/</span>';
-      html += '<a href="javascript:void(0)" onclick="ScanHelper._breadcrumbClick(\'' +
-        clickableParts[j].replace(/'/g, "\\'") + '\')" style="color:var(--primary); text-decoration:none;">' +
-        parts[j].replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</a>';
-    }
-    html += '</div>';
+    // 只显示有未导入文件的目录
+    const dirsWithNew = subdirs.filter(function(d) { return d.newCount > 0; });
+    const dirsNoNew = subdirs.filter(function(d) { return d.newCount === 0; });
 
-    // ---- 返回上级按钮 ----
-    if (d.parentDir) {
-      html += '<button class="btn btn-outline btn-sm" onclick="ScanHelper.navigateUp()" style="margin-bottom:8px;">⬆ 返回上级</button>';
-    }
-
-    // ---- 统计信息 ----
-    html += '<div style="margin-bottom:8px; color:var(--text-muted); font-size:13px;">' +
-      '当前目录共 ' + d.total + ' 个文件，其中 <b style="color:var(--success);">' +
-      d.newCount + '</b> 个待导入，<b>' + d.existingCount + '</b> 个已存在</div>';
-
-    // ---- 子目录列表 ----
-    if (d.subdirs && d.subdirs.length > 0) {
-      html += '<div style="margin-bottom:4px;"><strong style="font-size:12px;">📁 子目录：</strong></div>';
-      html += '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">';
-      d.subdirs.forEach(function(sub) {
-        html += '<button class="btn btn-outline btn-sm" onclick="ScanHelper.navigateToSubdir(\'' +
-          sub.replace(/'/g, "\\'") + '\')">📁 ' +
-          sub.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</button>';
-      });
-      html += '</div>';
-    }
-
-    // ---- 文件列表表格 ----
-    if (d.newFiles.length > 0) {
-      html += '<table style="font-size:12px;"><thead><tr>';
-      html += '<th style="width:36px;"><input type="checkbox" id="syncSelectAll" onchange="ScanHelper._toggleSelectAll(this)" title="全选/取消全选"></th>';
-      html += '<th>文件名</th>';
-      html += '<th style="width:80px;">大小</th>';
-      html += '<th style="width:60px;">状态</th>';
+    if (dirsWithNew.length === 0 && dirsNoNew.length === 0) {
+      html += '<p style="text-align:center; color:var(--text-muted); padding:20px;">当前目录下没有子目录，或所有文件已录入系统</p>';
+    } else {
+      html += '<table style="font-size:12px; width:100%;"><thead><tr>';
+      html += '<th style="width:36px;"><input type="checkbox" id="syncSelectAllDirs" onchange="ScanHelper._toggleAllDirs(this)"></th>';
+      html += '<th>目录</th>';
+      html += '<th style="width:80px;">未导入</th>';
+      html += '<th style="width:60px;"></th>';
       html += '</tr></thead><tbody>';
-      d.newFiles.forEach(function(f, idx) {
-        html += '<tr>' +
-          '<td><input type="checkbox" class="syncFileCheck" value="' + idx + '" data-path="' +
-          f.path.replace(/"/g, '&quot;') + '" data-name="' +
-          f.name.replace(/"/g, '&quot;') + '"></td>' +
-          '<td>📄 ' + f.name.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>' +
-          '<td>' + formatFileSize(f.size) + '</td>' +
-          '<td><span class="badge active" style="font-size:10px;">待导入</span></td>' +
+
+      // 有新文件的目录
+      dirsWithNew.forEach(function(d) {
+        html += '<tr style="background:#f0fff0;">' +
+          '<td><input type="checkbox" class="syncDirCheck" data-path="' + d.path.replace(/"/g, '&quot;') + '" onchange="ScanHelper._updateChecked()"' +
+          (ScanHelper._state.checkedDirs.has(d.path) ? ' checked' : '') + '></td>' +
+          '<td>📁 <b>' + d.name.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</b></td>' +
+          '<td><span class="badge active" style="font-size:10px;">' + d.newCount + ' 个</span></td>' +
+          '<td><button class="btn btn-outline btn-sm" onclick="ScanHelper.enterDir(\'' + d.path.replace(/'/g, "\\'") + '\')" style="font-size:11px; padding:2px 6px;">📂 进入</button></td>' +
           '</tr>';
       });
-      html += '</tbody></table>';
-    } else if (d.total === 0 && (!d.subdirs || d.subdirs.length === 0)) {
-      html += '<p style="color:var(--text-muted);">当前目录为空，未找到支持的文件</p>';
-    }
 
-    // ---- 已存在文件折叠区 ----
-    if (d.existingFiles && d.existingFiles.length > 0) {
-      html += '<details style="margin-top:8px; font-size:12px;">' +
-        '<summary style="cursor:pointer; color:var(--text-muted);">已存在的文件 (' + d.existingFiles.length + ' 个)</summary>' +
-        '<div style="max-height:150px; overflow-y:auto; margin-top:4px;">';
-      d.existingFiles.forEach(function(f) {
-        html += '<div style="font-size:11px; color:var(--text-muted); padding:2px 0;">📄 ' +
-          f.name.replace(/</g, '&lt;').replace(/>/g, '&gt;') + ' (' + formatFileSize(f.size) + ')</div>';
-      });
-      html += '</div></details>';
+      // 没有新文件的目录（折叠显示）
+      if (dirsNoNew.length > 0) {
+        html += '<tr><td colspan="4" style="padding:4px 0;">' +
+          '<details style="font-size:11px;">' +
+          '<summary style="cursor:pointer; color:var(--text-muted);">已全部导入的目录 (' + dirsNoNew.length + ' 个)</summary>';
+        dirsNoNew.forEach(function(d) {
+          html += '<div style="padding:2px 20px; color:var(--text-muted); display:flex; justify-content:space-between;">' +
+            '<span>📁 ' + d.name.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>' +
+            '<button class="btn btn-outline btn-sm" onclick="ScanHelper.enterDir(\'' + d.path.replace(/'/g, "\\'") + '\')" style="font-size:11px; padding:2px 6px;">📂 进入</button>' +
+            '</div>';
+        });
+        html += '</details></td></tr>';
+      }
+
+      html += '</tbody></table>';
     }
 
     container.innerHTML = html;
 
-    // 显示/隐藏导入按钮
+    // 恢复已勾选状态
+    this._restoreChecks();
+
     var importBtn = document.getElementById('syncImportBtn');
-    if (d.newFiles.length > 0) {
-      importBtn.style.display = '';
-    } else {
-      importBtn.style.display = 'none';
+    if (importBtn) {
+      importBtn.style.display = this._state.checkedDirs.size > 0 ? '' : 'none';
     }
   },
 
-  /** 全选/取消全选 */
-  _toggleSelectAll(checkbox) {
-    document.querySelectorAll('.syncFileCheck').forEach(function(cb) {
-      cb.checked = checkbox.checked;
-    });
-  },
-
-  /** 获取选中的文件列表 */
-  _getSelectedFiles() {
-    var checked = document.querySelectorAll('.syncFileCheck:checked');
-    var result = [];
-    for (var i = 0; i < checked.length; i++) {
-      result.push({
-        path: checked[i].getAttribute('data-path'),
-        name: checked[i].getAttribute('data-name'),
+  /** 全选/取消所有有新文件的目录 */
+  _toggleAllDirs(cb) {
+    var self = this;
+    if (cb.checked) {
+      document.querySelectorAll('.syncDirCheck').forEach(function(c) {
+        c.checked = true;
+        self._state.checkedDirs.add(c.getAttribute('data-path'));
+      });
+    } else {
+      document.querySelectorAll('.syncDirCheck').forEach(function(c) {
+        c.checked = false;
+        self._state.checkedDirs.delete(c.getAttribute('data-path'));
       });
     }
-    return result;
+    this._updateChecked();
   },
 
-  /** 面包屑点击导航 */
-  _breadcrumbClick(dir) {
-    document.getElementById('syncDirectory').value = dir;
-    this.scanDirectory(dir);
+  /** 恢复已保存的勾选状态 */
+  _restoreChecks() {
+    var self = this;
+    document.querySelectorAll('.syncDirCheck').forEach(function(c) {
+      c.checked = self._state.checkedDirs.has(c.getAttribute('data-path'));
+    });
+    var allCb = document.getElementById('syncSelectAllDirs');
+    if (allCb) {
+      var all = document.querySelectorAll('.syncDirCheck');
+      if (all.length > 0) {
+        allCb.checked = Array.from(all).every(function(c) { return c.checked; });
+      }
+    }
   },
 
-  /** 导入选中的文件 */
-  async importFiles() {
-    var selectedFiles = this._getSelectedFiles();
-    if (selectedFiles.length === 0) {
-      showToast('请至少选择一个文件', 'error');
+  /** 更新勾选状态 */
+  _updateChecked() {
+    var self = this;
+    document.querySelectorAll('.syncDirCheck').forEach(function(c) {
+      if (c.checked) {
+        self._state.checkedDirs.add(c.getAttribute('data-path'));
+      } else {
+        self._state.checkedDirs.delete(c.getAttribute('data-path'));
+      }
+    });
+    var importBtn = document.getElementById('syncImportBtn');
+    if (importBtn) {
+      importBtn.style.display = self._state.checkedDirs.size > 0 ? '' : 'none';
+    }
+    var allCb = document.getElementById('syncSelectAllDirs');
+    if (allCb) {
+      var all = document.querySelectorAll('.syncDirCheck');
+      if (all.length > 0) {
+        allCb.checked = Array.from(all).every(function(c) { return c.checked; });
+      }
+    }
+  },
+
+  /** 导入选中的目录 */
+  async importDirs() {
+    var dirs = Array.from(this._state.checkedDirs);
+    if (dirs.length === 0) {
+      showToast('请至少选择一个目录', 'error');
       return;
     }
 
@@ -549,9 +653,9 @@ const ScanHelper = {
     }
 
     try {
-      var res = await API.post('/scan/import', {
+      var res = await API.post('/scan/import-dirs', {
         module: this._module,
-        files: selectedFiles,
+        dirs: dirs,
         category: category,
       });
       showToast(res.message, 'success');
@@ -563,7 +667,7 @@ const ScanHelper = {
       showToast('导入失败: ' + err.message, 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = '📥 导入选中文件';
+      btn.textContent = '📥 导入选中目录';
     }
   },
 };

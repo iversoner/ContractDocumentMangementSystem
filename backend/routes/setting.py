@@ -35,11 +35,6 @@ def get_settings():
             'backupEnabled': settings.get('db_backup_enabled', 'false').lower() == 'true',
             'backupInterval': settings.get('db_backup_interval', 'daily'),
         },
-        'storage': {
-            'uploadFolder': settings.get('storage_upload_folder', current_app.config.get('STORAGE_UPLOAD_FOLDER', '')),
-            'maxFileSize': int(settings.get('storage_max_file_size', current_app.config.get('STORAGE_MAX_FILE_SIZE', 10485760))),
-            'allowedTypes': settings.get('storage_allowed_types', '.pdf,.doc,.docx,.xls,.xlsx,.jpg,.png'),
-        },
         'reminder': {
             'enabled': settings.get('reminder_enabled', str(current_app.config.get('REMINDER_ENABLED', False))).lower() == 'true',
             'daysBefore': int(settings.get('reminder_days_before', current_app.config.get('REMINDER_DAYS_BEFORE', 30))),
@@ -56,42 +51,69 @@ def update_settings():
     data = request.get_json() or {}
     db = get_db()
 
+    # 读取旧配置用于对比日志
+    old_rows = db.execute("SELECT key, value FROM settings").fetchall()
+    old_settings = {r['key']: r['value'] for r in old_rows}
+
     updates = []
+    detail_parts = []
+
     if 'email' in data:
         e = data['email']
-        updates.extend([
-            ('email_smtp_server', str(e.get('smtpServer', ''))),
-            ('email_smtp_port', str(e.get('smtpPort', 587))),
-            ('email_username', str(e.get('username', ''))),
-            ('email_use_tls', str(e.get('useTLS', True)).lower()),
-            ('email_sender_name', str(e.get('senderName', ''))),
-        ])
-        # 只有密码不为空时才更新密码（空字符串表示不修改）
+        email_keys = [
+            ('email_smtp_server', 'SMTP服务器', str(e.get('smtpServer', ''))),
+            ('email_smtp_port', 'SMTP端口', str(e.get('smtpPort', 587))),
+            ('email_username', '邮箱账号', str(e.get('username', ''))),
+            ('email_use_tls', 'TLS', str(e.get('useTLS', True)).lower()),
+            ('email_sender_name', '发件人名称', str(e.get('senderName', ''))),
+        ]
+        for key, label, new_val in email_keys:
+            old_val = old_settings.get(key, '')
+            if old_val != new_val:
+                detail_parts.append(f'{label}: "{old_val}" → "{new_val}"')
+            updates.append((key, new_val))
+        # 密码单独处理（仅非空时更新）
         pwd = str(e.get('password', ''))
         if pwd:
+            old_pwd = old_settings.get('email_password', '')
+            if old_pwd != pwd:
+                detail_parts.append('邮箱密码: 已更新')
             updates.append(('email_password', pwd))
+
     if 'database' in data:
         d = data['database']
-        updates.extend([
-            ('db_path', str(d.get('path', ''))),
-            ('db_backup_enabled', str(d.get('backupEnabled', False)).lower()),
-            ('db_backup_interval', str(d.get('backupInterval', 'daily'))),
-        ])
-    if 'storage' in data:
-        s = data['storage']
-        updates.extend([
-            ('storage_upload_folder', str(s.get('uploadFolder', ''))),
-            ('storage_max_file_size', str(s.get('maxFileSize', 10485760))),
-            ('storage_allowed_types', str(s.get('allowedTypes', ''))),
-        ])
+        db_keys = [
+            ('db_path', '数据库路径', str(d.get('path', ''))),
+            ('db_backup_enabled', '备份启用', str(d.get('backupEnabled', False)).lower()),
+            ('db_backup_interval', '备份间隔', str(d.get('backupInterval', 'daily'))),
+        ]
+        for key, label, new_val in db_keys:
+            old_val = old_settings.get(key, '')
+            if old_val != new_val:
+                detail_parts.append(f'{label}: "{old_val}" → "{new_val}"')
+            updates.append((key, new_val))
+
     if 'reminder' in data:
         r = data['reminder']
-        updates.extend([
-            ('reminder_enabled', str(r.get('enabled', False)).lower()),
-            ('reminder_days_before', str(r.get('daysBefore', 30))),
-            ('reminder_send_time', str(r.get('sendTime', '09:00'))),
-            ('reminder_recipients', str(r.get('recipients', ''))),
-        ])
+        reminder_keys = [
+            ('reminder_enabled', '提醒开关', str(r.get('enabled', False)).lower()),
+            ('reminder_days_before', '提前天数', str(r.get('daysBefore', 30))),
+            ('reminder_send_time', '发送时间', str(r.get('sendTime', '09:00'))),
+            ('reminder_recipients', '收件人', str(r.get('recipients', ''))),
+        ]
+        for key, label, new_val in reminder_keys:
+            old_val = old_settings.get(key, '')
+            if old_val != new_val:
+                detail_parts.append(f'{label}: "{old_val}" → "{new_val}"')
+            updates.append((key, new_val))
+
+        # 重置调度器状态
+        try:
+            from services.scheduler_service import reset_send_state
+            reset_send_state()
+            detail_parts.append('调度器发送状态已重置（下次心跳重新评估）')
+        except ImportError:
+            pass
 
     for key, value in updates:
         db.execute(
@@ -101,7 +123,8 @@ def update_settings():
         )
     db.commit()
 
-    write_log(action='修改配置', module='系统配置', detail='更新系统配置参数',
+    log_detail = '；'.join(detail_parts) if detail_parts else '配置已保存（无变更）'
+    write_log(action='修改配置', module='系统配置', detail=log_detail,
               user_id=g.user_id, username=g.username)
 
     return jsonify({'success': True, 'message': '配置已保存'})

@@ -131,18 +131,19 @@
             <tr>
               <th data-col="select"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" title="全选"></th>
               <th data-col="id">ID</th>
-              <th data-col="name">合同名称</th>
+              <th data-col="name" class="sortable-th" onclick="handleSort('name')">合同名称<span class="sort-icon">⇅</span></th>
               <th data-col="category">类别</th>
               <th data-col="company">合同公司</th>
               <th data-col="agent">对接业务员</th>
               <th data-col="createdAt">创建时间</th>
               <th data-col="updatedAt">更新时间</th>
-              <th data-col="endDate">到期时间</th>
+              <th data-col="endDate" class="sortable-th" onclick="handleSort('end_date')">到期时间<span class="sort-icon">⇅</span></th>
               <th data-col="status">状态</th>
               <th data-col="emailReminder">邮件提醒</th>
-              <th data-col="priority">重要等级</th>
+              <th data-col="priority" class="sortable-th" onclick="handleSort('priority')">重要等级<span class="sort-icon">⇅</span></th>
               <th data-col="filePath">本地文件</th>
               <th data-col="source">来源</th>
+              <th data-col="isComplete">完整性</th>
               <th data-col="remark">备注</th>
               <th data-col="actions">操作</th>
             </tr>
@@ -215,12 +216,6 @@
           </div>
         </div>
         <div class="form-group">
-          <label>附件上传</label>
-          <input type="file" class="form-control" id="contractFile" style="padding:5px;">
-          <input type="hidden" id="contractFilePath">
-          <small style="color:var(--text-muted);">选择文件后自动上传，或留空跳过</small>
-        </div>
-        <div class="form-group">
           <label>备注</label>
           <textarea class="form-control" id="contractRemark" placeholder="备注信息（选填）"></textarea>
         </div>
@@ -268,18 +263,19 @@
         <h2>📂 本地文件同步</h2>
         <button class="modal-close" onclick="closeModal('syncModal')">&times;</button>
       </div>
-      <div class="form-group">
-        <label>本地目录路径</label>
-        <div style="display:flex; gap:8px;">
-          <input type="text" class="form-control" id="syncDirectory" placeholder="例如: E:\GitProject\Private\Data\contract\2011" style="flex:1;">
-          <button type="button" class="btn btn-primary" id="syncScanBtn" onclick="ScanHelper.scanDirectory()">🔍 扫描</button>
+      <div style="padding:12px 0;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="ScanHelper.goRoot()" title="返回根目录">🏠</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="ScanHelper.goUp()" title="返回上级">⬆</button>
+          <span style="font-size:12px; color:var(--text-muted);" id="syncCurrentDir" data-parent="">/data</span>
+          <span id="syncNewBadge" class="badge active" style="font-size:10px; display:none;"></span>
         </div>
-        <small style="color:var(--text-muted);">输入包含合同文件的文件夹路径，支持浏览子目录选择导入</small>
+        <small style="color:var(--text-muted);">勾选要导入的目录，系统将导入目录下所有未录入的文件（递归包含子目录）。已导入的文件不会重复录入。</small>
       </div>
       <div id="syncResult" style="max-height:400px; overflow-y:auto; margin:12px 0; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px;"></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" onclick="closeModal('syncModal')">关闭</button>
-        <button type="button" class="btn btn-primary" id="syncImportBtn" onclick="ScanHelper.importFiles()" style="display:none;">📥 导入选中文件</button>
+        <button type="button" class="btn btn-primary" id="syncImportBtn" onclick="ScanHelper.importDirs()" style="display:none;">📥 导入选中目录</button>
       </div>
     </div>
   </div>
@@ -288,6 +284,23 @@
   <script>
     let currentPage = 1;
     const pageSize = 8;
+    let sortState = { by: null, order: null };
+
+    function handleSort(colKey) {
+      if (sortState.by === colKey) {
+        sortState.order = sortState.order === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortState.by = colKey;
+        sortState.order = 'asc';
+      }
+      currentPage = 1;
+      renderTable();
+    }
+
+    function renderSortIcon(colKey) {
+      if (sortState.by !== colKey) return ' <span class="sort-icon">⇅</span>';
+      return sortState.order === 'asc' ? ' <span class="sort-icon" style="color:#1890ff;">▲</span>' : ' <span class="sort-icon" style="color:#1890ff;">▼</span>';
+    }
 
     async function loadContracts(params = {}) {
       params.page = params.page || currentPage;
@@ -295,6 +308,7 @@
       if (document.getElementById('filterCategory').value) params.category = document.getElementById('filterCategory').value;
       if (document.getElementById('filterStatus').value) params.status = document.getElementById('filterStatus').value;
       if (document.getElementById('searchKeyword').value) params.keyword = document.getElementById('searchKeyword').value;
+      if (sortState.by) { params.sortBy = sortState.by; params.sortOrder = sortState.order; }
       try { const res = await API.get('/contracts', params); return res.data; }
       catch (err) { showToast('加载失败: ' + err.message, 'error'); return { items: [], total: 0 }; }
     }
@@ -324,8 +338,9 @@
             <td data-col="status">${getStatusBadge(c.status)}</td>
             <td data-col="emailReminder"><input type="checkbox" ${c.emailReminder !== false ? 'checked' : ''} onchange="toggleReminder('contracts', ${c.id}, this.checked)" title="邮件提醒"></td>
             <td data-col="priority">${getPriorityBadge(c.priority)}</td>
-            <td data-col="filePath"><a href="javascript:void(0)" onclick="showToast('文件: ${c.filePath || '(无)'}', 'info')">📎 查看</a></td>
+            <td data-col="filePath">${c.hostFilePath ? `<a href="javascript:void(0)" onclick="showFilePathDialog('${c.hostFilePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="${c.hostFilePath.replace(/\\/g, '\\\\')}">📎 查看</a>` : '<span style="color:var(--text-muted);">-</span>'}</td>
             <td data-col="source"><span class="badge ${c.source === 'scan' ? 'badge-info' : 'badge-default'}">${c.source === 'scan' ? '扫描导入' : '手动录入'}</span></td>
+            <td data-col="isComplete">${getIsCompleteBadge(c.isComplete)}</td>
             <td data-col="remark">${c.remark || '-'}</td>
             <td data-col="actions">
               <button class="btn btn-outline btn-sm" onclick="editContract(${c.id})">编辑</button>
@@ -336,6 +351,7 @@
       }
 
       applyColumnVisibility();
+      updateSortIcons();
 
       // 分页
       const totalPages = Math.ceil(data.total / pageSize);
@@ -354,6 +370,26 @@
 
     function goPage(p) { currentPage = p; renderTable(); }
 
+    function updateSortIcons() {
+      document.querySelectorAll('.sortable-th').forEach(function(th) {
+        var colKey = th.getAttribute('onclick').match(/handleSort\('(\w+)'\)/);
+        if (!colKey) return;
+        var icon = th.querySelector('.sort-icon');
+        if (!icon) return;
+        colKey = colKey[1];
+        if (sortState.by !== colKey) {
+          icon.textContent = '⇅';
+          icon.style.color = '#ccc';
+        } else if (sortState.order === 'asc') {
+          icon.textContent = '▲';
+          icon.style.color = '#1890ff';
+        } else {
+          icon.textContent = '▼';
+          icon.style.color = '#1890ff';
+        }
+      });
+    }
+
     function openContractModal() {
       document.getElementById('contractModalTitle').textContent = '新增合同';
       const today = new Date().toISOString().substring(0, 10);
@@ -367,30 +403,11 @@
       document.getElementById('contractContactEmail').value = '';
       document.getElementById('contractStartDate').value = today;
       document.getElementById('contractEndDate').value = '';
-      document.getElementById('contractFilePath').value = '';
-      document.getElementById('contractFile').value = '';
       document.getElementById('contractRemark').value = '';
       document.getElementById('contractEmailReminder').checked = true;
       document.getElementById('contractPriority').value = '普通';
       openModal('contractModal');
     }
-
-    // Auto-upload file when selected
-    document.getElementById('contractFile').addEventListener('change', async function() {
-      const file = this.files[0];
-      if (!file) return;
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('category', document.getElementById('contractCategory').value || '合同');
-      try {
-        const res = await API.upload('/files/upload', formData);
-        document.getElementById('contractFilePath').value = res.data.storedPath;
-        showToast('文件已上传', 'success');
-      } catch (err) {
-        showToast('文件上传失败: ' + err.message, 'error');
-        this.value = '';
-      }
-    });
 
     function editContract(id) {
       API.get('/contracts/' + id).then(res => {
@@ -406,7 +423,6 @@
         document.getElementById('contractContactEmail').value = c.contactEmail || '';
         document.getElementById('contractStartDate').value = c.startDate;
         document.getElementById('contractEndDate').value = c.endDate;
-        document.getElementById('contractFilePath').value = c.filePath || '';
         document.getElementById('contractRemark').value = c.remark || '';
         document.getElementById('contractEmailReminder').checked = c.emailReminder !== false;
         document.getElementById('contractPriority').value = c.priority || '普通';
@@ -427,7 +443,6 @@
         agent: document.getElementById('contractAgent').value,
         startDate: document.getElementById('contractStartDate').value,
         endDate: document.getElementById('contractEndDate').value,
-        filePath: document.getElementById('contractFilePath').value,
         remark: document.getElementById('contractRemark').value,
         emailReminder: document.getElementById('contractEmailReminder').checked,
         priority: document.getElementById('contractPriority').value,
@@ -471,7 +486,7 @@
             <div><strong>到期日期：</strong>${c.endDate}</div>
             <div><strong>状态：</strong>${getStatusBadge(c.status)}</div>
             <div><strong>创建时间：</strong>${c.createdAt}</div>
-            <div><strong>文件路径：</strong>${c.filePath || '无'}</div>
+            <div><strong>文件路径：</strong>${c.hostFilePath || '无'}</div>
             <div style="grid-column: 1/-1;"><strong>备注：</strong>${c.remark || '无'}</div>
           </div>
         `;
@@ -543,6 +558,7 @@
       { key: 'priority', label: '重要等级', defaultVisible: false },
       { key: 'filePath', label: '本地文件', defaultVisible: false },
       { key: 'source', label: '来源', defaultVisible: false },
+      { key: 'isComplete', label: '完整性', defaultVisible: true },
       { key: 'remark', label: '备注', defaultVisible: true },
     ];
 

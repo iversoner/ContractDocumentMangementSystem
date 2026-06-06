@@ -10,7 +10,7 @@
 
 | 层级 | 技术选型 |
 |------|----------|
-| 后端 | Python 3.11+ / Flask 3.x / Gunicorn (生产) |
+| 后端 | Python 3 / Flask 3.x / Gunicorn (生产) |
 | 前端 | HTML5 / CSS3 / Vanilla JavaScript |
 | 数据库 | SQLite3 (WAL 模式)，北京时间函数 `beijing_now()` |
 | 文件存储 | 本地文件夹 (用户自选) |
@@ -83,7 +83,8 @@ suzhenManagementSystem/
 │   ├── services/
 │   │   ├── auth_service.py    # bcrypt 密码哈希 + JWT
 │   │   ├── email_service.py   # SMTP 邮件发送
-│   │   └── log_service.py     # 统一日志写入
+│   │   ├── log_service.py     # 统一日志写入
+│   │   └── scheduler_service.py # APScheduler 定时邮件提醒
 │   ├── middleware/
 │   │   ├── auth_middleware.py  # login_required / admin_required 装饰器
 │   │   └── error_handler.py   # 全局异常处理
@@ -96,7 +97,7 @@ suzhenManagementSystem/
 │   └── suzhen-images.tar     #   预构建镜像（build.bat 生成）
 └── docker/                    # Docker 配置
     ├── Dockerfile              # 前端镜像 (nginx:alpine)
-    ├── Dockerfile.backend      # 后端镜像 (python:3.11-slim + gunicorn)
+    ├── Dockerfile.backend      # 后端镜像 (python slim + gunicorn, PYTHON_VERSION build arg)
     ├── nginx.conf              # nginx 配置 (静态文件 + /api 反向代理)
     ├── docker-compose.yaml     # 全栈编排 (frontend + backend + 网络)
     ├── .dockerignore           # 排除 .venv / __pycache__ 等
@@ -115,7 +116,7 @@ suzhenManagementSystem/
          ├── /            → 静态文件 (frontend/)
          ├── /api/*       → proxy_pass → backend:5000
          │
-    [backend:5000]  (Flask 容器, python:3.11-slim + gunicorn)
+    [backend:5000]  (Flask 容器, python slim + gunicorn)
          │
          ├── SQLite DB  → /data/suzhen.db  (bind mount → 用户选择的本地目录)
          └── Uploads    → /data/uploads    (bind mount → 用户选择的本地目录)
@@ -140,7 +141,7 @@ suzhenManagementSystem/
 | 步骤 | 说明 |
 |------|------|
 | 1. 检测 Docker | 自动检测 Docker Desktop 是否安装，未安装则引导下载 |
-| 2. 配置镜像 | 可选阿里云/1ms.run 镜像加速（国内必须） |
+| 2. 配置镜像 | 可选 DaoCloud/1ms.run/阿里云 镜像加速（国内必须） |
 | 3. 选择数据目录 | 选择本地目录存储数据库和上传文件 |
 | 4. 获取 IP | 自动读取本机 IPv4，用户配置端口 |
 | 5. 构建启动 | 拉取镜像、构建服务、启动全栈 |
@@ -289,9 +290,12 @@ g.db.create_function('beijing_now', 0, beijing_now)
 - [x] 权限分配（管理员全部权限 / 业务员无删除、无系统配置、无用户管理、同角色可见、自己日志可见）
 - [x] 交付打包（预构建 Docker 镜像 + 客户一键启动脚本 + DaoCloud 镜像加速）
 - [x] 时区修复（SQLite 自定义 beijing_now() 函数，统一北京时间写入）
-- [x] 数据导出重写（openpyxl 生成 .xlsx 多 Sheet 工作簿，保存到 /data/exports/）
+- [x] 数据导出重写（openpyxl 生成 .xlsx 多 Sheet 工作簿，保存到 /data/download/）
 - [x] setup.bat IP 获取优化（优先 WLAN 网卡，排除 VMware/VirtualBox 虚拟网卡）
 - [x] Docker 目录扫描（📂 文件夹选择器 + webkitRelativePath → 容器内路径自动填入 + 容错提示）
+- [x] 删除文件存储配置模块（上传路径从 config.yaml + 环境变量读取，settings 页面中的存储配置无实际作用）
+- [x] 定时邮件提醒修复（APScheduler 时间匹配从精确等于改为 >=，避免分钟级漂移导致漏发）
+- [x] 导出流程优化（后端直接保存到挂载目录 /data/download/，前端弹窗展示路径，用户确认关闭）
 
 ---
 
@@ -306,9 +310,9 @@ g.db.create_function('beijing_now', 0, beijing_now)
 | 车险续期 | `insurance.html` | 页面级统计卡片、状态/保险公司/关键词筛选(手动搜索按钮)、增删改查、详情弹窗、分页、邮件提醒开关列、重要等级标签列、全选/批量设置邮件提醒/批量设置等级 |
 | 文件管理 | `files.html` | 文件上传/下载/删除、类别固定可选(合同/专利/车险续期)、类别/关键词筛选(手动搜索按钮)、分页 |
 | 用户管理 | `users.html` | 用户增删改查、角色/状态筛选(手动搜索按钮)、重置密码（管理员专用） |
-| 系统配置 | `settings.html` | 邮箱SMTP配置、数据库配置、到期提醒配置、文件存储配置、测试发送、密码眼睛图标(隐藏=斜杠眼/可见=普通眼) |
+| 系统配置 | `settings.html` | 邮箱SMTP配置、数据库配置、到期提醒配置、测试发送、密码眼睛图标(隐藏=斜杠眼/可见=普通眼) |
 | 系统日志 | `logs.html` | 级别/模块筛选(手动搜索按钮)、关键词搜索、清空日志、分页 |
-| 数据导出 | `export.html` | 三种导出方式(全部/按创建时间/按到期时间)、日期范围选择、Excel (.xlsx) 导出，生成带格式的多 Sheet 工作簿保存到 `/data/exports/`，前端显示导出文件路径 |
+| 数据导出 | `export.html` | 三种导出方式(全部/按创建时间/按到期时间)、日期范围选择、Excel (.xlsx) 导出，生成带格式的多 Sheet 工作簿保存到 `/data/download/`，弹窗展示导出结果和文件路径，用户确认后关闭 |
 
 ### 全局技术特性
 
@@ -339,6 +343,15 @@ g.db.create_function('beijing_now', 0, beijing_now)
 - 表头全选复选框 + 批量操作栏（开启/关闭邮件提醒、设置重要等级）
 - 新增/编辑模态框包含邮件提醒复选框（默认勾选）和重要等级下拉（默认普通）
 - 共享工具函数：`toggleSelectAll()`、`updateBatchBar()`、`getCheckedIds()`、`toggleReminder()`、`batchUpdate()`、`getPriorityBadge()`
+
+### 定时邮件提醒（APScheduler）
+
+- `backend/services/scheduler_service.py` 使用 APScheduler 后台调度器，每 60 秒检查一次
+- 时间匹配使用 `>=`（非精确等于），避免调度器漂移导致错过当天发送窗口
+- `_last_sent_date` 全局变量保证每天只发送一次
+- 通过 `scheduler.lock` 文件锁防止 gunicorn 多 worker 重复启动
+- 提醒内容从 contracts、patents、insurances 三表查询，只包含 `status='active'` 且 `email_reminder=1` 的记录
+- `run.py` 启动时自动初始化调度器，`atexit` 注册关闭回调
 
 ---
 
@@ -384,14 +397,15 @@ g.db.create_function('beijing_now', 0, beijing_now)
 
 ### 文件存储
 
-- Docker 环境：文件保存到 `/data/exports/`
-- 本地开发：文件保存到 `backend/exports/`
+- Docker 环境：文件保存到 `/data/download/`
+- 本地开发：文件保存到 `data/download/`
 - 文件名格式：`export_YYYY-MM-DD_HH-mm-ss.xlsx`（北京时间）
 
 ### 前端交互
 
-- 导出成功后显示文件名和完整路径
-- 页面底部绿色提示栏展示最近一次导出结果
+- 导出成功后弹出模态弹窗，展示各模块导出条数统计和完整文件保存路径
+- 用户点击"确定"按钮确认后关闭弹窗
+- 文件直接保存在服务器挂载目录，无需浏览器下载
 
 ### 涉及文件
 - `backend/routes/export.py` — 导出 API，`_export_dir()` 自动判断环境

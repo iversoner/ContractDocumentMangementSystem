@@ -139,7 +139,7 @@
             <tr>
               <th data-col="select"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" title="全选"></th>
               <th data-col="id">ID</th>
-              <th data-col="plateNo">车牌号</th>
+              <th data-col="plateNo" class="sortable-th" onclick="handleSort('name')">车牌号<span class="sort-icon">⇅</span></th>
               <th data-col="brand">品牌型号</th>
               <th data-col="insuranceCompany">保险公司</th>
               <th data-col="insuranceType">险种</th>
@@ -147,12 +147,13 @@
               <th data-col="agent">对接业务员</th>
               <th data-col="createdAt">创建时间</th>
               <th data-col="updatedAt">更新时间</th>
-              <th data-col="endDate">到期时间</th>
+              <th data-col="endDate" class="sortable-th" onclick="handleSort('end_date')">到期时间<span class="sort-icon">⇅</span></th>
               <th data-col="status">状态</th>
               <th data-col="emailReminder">邮件提醒</th>
-              <th data-col="priority">重要等级</th>
+              <th data-col="priority" class="sortable-th" onclick="handleSort('priority')">重要等级<span class="sort-icon">⇅</span></th>
               <th data-col="filePath">本地文件</th>
               <th data-col="source">来源</th>
+              <th data-col="isComplete">完整性</th>
               <th data-col="remark">备注</th>
               <th data-col="actions">操作</th>
             </tr>
@@ -220,12 +221,6 @@
           </div>
         </div>
         <div class="form-group">
-          <label>附件上传</label>
-          <input type="file" class="form-control" id="insFile" style="padding:5px;">
-          <input type="hidden" id="insFilePath">
-          <small style="color:var(--text-muted);">选择文件后自动上传，或留空跳过</small>
-        </div>
-        <div class="form-group">
           <label>备注</label>
           <textarea class="form-control" id="insRemark" placeholder="备注信息（选填）"></textarea>
         </div>
@@ -273,18 +268,19 @@
         <h2>📂 本地文件同步</h2>
         <button class="modal-close" onclick="closeModal('syncModal')">&times;</button>
       </div>
-      <div class="form-group">
-        <label>本地目录路径</label>
-        <div style="display:flex; gap:8px;">
-          <input type="text" class="form-control" id="syncDirectory" placeholder="例如: E:\GitProject\Private\Data\insurance\2011" style="flex:1;">
-          <button type="button" class="btn btn-primary" id="syncScanBtn" onclick="ScanHelper.scanDirectory()">🔍 扫描</button>
+      <div style="padding:12px 0;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="ScanHelper.goRoot()" title="返回根目录">🏠</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="ScanHelper.goUp()" title="返回上级">⬆</button>
+          <span style="font-size:12px; color:var(--text-muted);" id="syncCurrentDir" data-parent="">/data</span>
+          <span id="syncNewBadge" class="badge active" style="font-size:10px; display:none;"></span>
         </div>
-        <small style="color:var(--text-muted);">输入包含车险文件的文件夹路径，支持浏览子目录选择导入</small>
+        <small style="color:var(--text-muted);">勾选要导入的目录，系统将导入目录下所有未录入的文件（递归包含子目录）。已导入的文件不会重复录入。</small>
       </div>
       <div id="syncResult" style="max-height:400px; overflow-y:auto; margin:12px 0; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px;"></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" onclick="closeModal('syncModal')">关闭</button>
-        <button type="button" class="btn btn-primary" id="syncImportBtn" onclick="ScanHelper.importFiles()" style="display:none;">📥 导入选中文件</button>
+        <button type="button" class="btn btn-primary" id="syncImportBtn" onclick="ScanHelper.importDirs()" style="display:none;">📥 导入选中目录</button>
       </div>
     </div>
   </div>
@@ -293,12 +289,30 @@
   <script>
     let insPage = 1;
     const insPageSize = 8;
+    let sortState = { by: null, order: null };
+
+    function handleSort(colKey) {
+      if (sortState.by === colKey) {
+        sortState.order = sortState.order === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortState.by = colKey;
+        sortState.order = 'asc';
+      }
+      insPage = 1;
+      renderInsTable();
+    }
+
+    function renderSortIcon(colKey) {
+      if (sortState.by !== colKey) return ' <span class="sort-icon">⇅</span>';
+      return sortState.order === 'asc' ? ' <span class="sort-icon" style="color:#1890ff;">▲</span>' : ' <span class="sort-icon" style="color:#1890ff;">▼</span>';
+    }
 
     async function loadInsurances() {
       const params = { page: insPage, pageSize: insPageSize };
       if (document.getElementById('filterInsStatus').value) params.status = document.getElementById('filterInsStatus').value;
       if (document.getElementById('filterInsCompany').value) params.company = document.getElementById('filterInsCompany').value;
       if (document.getElementById('insSearch').value) params.keyword = document.getElementById('insSearch').value;
+      if (sortState.by) { params.sortBy = sortState.by; params.sortOrder = sortState.order; }
       try { const res = await API.get('/insurances', params); return res.data; }
       catch (err) { showToast('加载失败: ' + err.message, 'error'); return { items: [], total: 0 }; }
     }
@@ -330,8 +344,9 @@
             <td data-col="status">${getStatusBadge(i.status)}</td>
             <td data-col="emailReminder"><input type="checkbox" ${i.emailReminder !== false ? 'checked' : ''} onchange="toggleReminder('insurances', ${i.id}, this.checked)" title="邮件提醒"></td>
             <td data-col="priority">${getPriorityBadge(i.priority)}</td>
-            <td data-col="filePath"><a href="javascript:void(0)" onclick="showToast('文件链接(模拟): ${i.filePath || '无'}', 'info')">📎 查看</a></td>
+            <td data-col="filePath">${i.hostFilePath ? `<a href="javascript:void(0)" onclick="showFilePathDialog('${i.hostFilePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="${i.hostFilePath.replace(/\\/g, '\\\\')}">📎 查看</a>` : '<span style="color:var(--text-muted);">-</span>'}</td>
             <td data-col="source"><span class="badge ${i.source === 'scan' ? 'badge-info' : 'badge-default'}">${i.source === 'scan' ? '扫描导入' : '手动录入'}</span></td>
+            <td data-col="isComplete">${getIsCompleteBadge(i.isComplete)}</td>
             <td data-col="remark">${i.remark || '-'}</td>
             <td data-col="actions">
               <button class="btn btn-outline btn-sm" onclick="editIns(${i.id})">编辑</button>
@@ -342,6 +357,7 @@
       }
 
       applyColumnVisibility();
+      updateSortIcons();
 
       // 更新统计卡片
       try {
@@ -365,6 +381,26 @@
 
     function goInsPage(p) { insPage = p; renderInsTable(); }
 
+    function updateSortIcons() {
+      document.querySelectorAll('.sortable-th').forEach(function(th) {
+        var colKey = th.getAttribute('onclick').match(/handleSort\('(\w+)'\)/);
+        if (!colKey) return;
+        var icon = th.querySelector('.sort-icon');
+        if (!icon) return;
+        colKey = colKey[1];
+        if (sortState.by !== colKey) {
+          icon.textContent = '⇅';
+          icon.style.color = '#ccc';
+        } else if (sortState.order === 'asc') {
+          icon.textContent = '▲';
+          icon.style.color = '#1890ff';
+        } else {
+          icon.textContent = '▼';
+          icon.style.color = '#1890ff';
+        }
+      });
+    }
+
     async function deleteIns(id, plate) {
       if (!confirm('确定删除车险记录「' + plate + '」吗？')) return;
       try { await API.del('/insurances/' + id); showToast('车险记录已删除', 'success'); renderInsTable(); }
@@ -374,33 +410,15 @@
     function openInsModal() {
       document.getElementById('insModalTitle').textContent = '新增车险记录';
       const today = new Date().toISOString().substring(0, 10);
-      ['insId','insPlateNo','insBrand','insCompany','insType','insAmount','insAgent','insFilePath','insRemark'].forEach(id => {
+      ['insId','insPlateNo','insBrand','insCompany','insType','insAmount','insAgent','insRemark'].forEach(id => {
         document.getElementById(id).value = '';
       });
       document.getElementById('insCreateDate').value = today;
       document.getElementById('insExpireDate').value = '';
-      document.getElementById('insFile').value = '';
       document.getElementById('insEmailReminder').checked = true;
       document.getElementById('insPriority').value = '普通';
       openModal('insModal');
     }
-
-    // Auto-upload file when selected
-    document.getElementById('insFile').addEventListener('change', async function() {
-      const file = this.files[0];
-      if (!file) return;
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('category', '车险续期');
-      try {
-        const res = await API.upload('/files/upload', formData);
-        document.getElementById('insFilePath').value = res.data.storedPath;
-        showToast('文件已上传', 'success');
-      } catch (err) {
-        showToast('文件上传失败: ' + err.message, 'error');
-        this.value = '';
-      }
-    });
 
     function editIns(id) {
       API.get('/insurances/' + id).then(res => { const i = res.data;
@@ -414,7 +432,6 @@
       document.getElementById('insAgent').value = i.agent;
       document.getElementById('insCreateDate').value = (i.startDate || '').substring(0, 10);
       document.getElementById('insExpireDate').value = i.endDate;
-      document.getElementById('insFilePath').value = i.filePath || '';
       document.getElementById('insRemark').value = i.remark || '';
       document.getElementById('insEmailReminder').checked = i.emailReminder !== false;
       document.getElementById('insPriority').value = i.priority || '普通';
@@ -434,7 +451,6 @@
         agent: document.getElementById('insAgent').value,
         startDate: document.getElementById('insCreateDate').value,
         endDate: document.getElementById('insExpireDate').value,
-        filePath: document.getElementById('insFilePath').value,
         remark: document.getElementById('insRemark').value,
         emailReminder: document.getElementById('insEmailReminder').checked,
         priority: document.getElementById('insPriority').value,
@@ -459,7 +475,7 @@
           <div><strong>创建时间：</strong>${i.createdAt || i.createTime}</div>
           <div><strong>到期时间：</strong>${i.endDate || i.expireTime}</div>
           <div><strong>状态：</strong>${getStatusBadge(i.status)}</div>
-          <div><strong>文件路径：</strong>${i.filePath || '无'}</div>
+          <div><strong>文件路径：</strong>${i.hostFilePath || '无'}</div>
           <div style="grid-column: 1/-1;"><strong>备注：</strong>${i.remark || '无'}</div>
         </div>
       `;
@@ -532,6 +548,7 @@
       { key: 'priority', label: '重要等级', defaultVisible: false },
       { key: 'filePath', label: '本地文件', defaultVisible: false },
       { key: 'source', label: '来源', defaultVisible: false },
+      { key: 'isComplete', label: '完整性', defaultVisible: true },
       { key: 'remark', label: '备注', defaultVisible: true },
     ];
 

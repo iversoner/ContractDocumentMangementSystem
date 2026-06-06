@@ -26,4 +26,4 @@ def register_blueprints(app):
     app.register_blueprint(log_bp, url_prefix='/api/logs')
     app.register_blueprint(setting_bp, url_prefix='/api/settings')
     app.register_blueprint(export_bp, url_prefix='/api/export')
-    app.register_blueprint(scan_bp)
+    app.register_blueprint(scan_bp, url_prefix='/api/scan')

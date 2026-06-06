@@ -44,7 +44,7 @@ exit /b 0
         echo.
         echo After install, configure registry mirror:
         echo Docker Desktop ^> Settings ^> Docker Engine, add:
-        echo   "registry-mirrors": ["https://docker.1ms.run"]
+        echo   "registry-mirrors": ["https://www.daocloud.io/mirror"]
         echo Apply ^& Restart, then re-run this script.
         echo.
         set /p OPEN="Open download page? (Y/N): "
@@ -58,6 +58,10 @@ exit /b 0
     if errorlevel 1 (
         docker-compose -f docker/docker-compose.yaml down 2>nul
     )
+    REM Also stop any containers from mode 3 that use suzhen-net
+    docker stop suzhen-frontend 2>nul
+    docker rm suzhen-frontend 2>nul
+    docker network rm suzhen-net 2>nul
 
     echo [2/2] Building and starting...
     docker compose -f docker/docker-compose.yaml up -d --build
@@ -94,9 +98,36 @@ exit /b 0
         goto :done
     )
 
-    docker compose -f docker/docker-compose.yaml up -d --build frontend 2>nul
+    echo Building frontend image...
+    docker compose -f docker/docker-compose.yaml build frontend
+    if errorlevel 1 docker-compose -f docker/docker-compose.yaml build frontend
+
+    REM Stop Docker backend and old frontend
+    docker stop suzhen-backend 2>nul
+    docker rm suzhen-backend 2>nul
+    docker stop suzhen-frontend 2>nul
+    docker rm suzhen-frontend 2>nul
+
+    REM Get host LAN IP for nginx to reach local Flask backend
+    set HOST_IP=127.0.0.1
+    for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /r "IPv4.*192\.168\." 2^>nul') do (
+        set TMP_IP=%%a
+        set TMP_IP=!TMP_IP: =!
+        if not "!TMP_IP!"=="" set HOST_IP=!TMP_IP!
+    )
+
+    echo Host IP: !HOST_IP!
+    echo Starting frontend container (nginx proxies to !HOST_IP!:5000)...
+
+    docker run -d --name suzhen-frontend ^
+        --add-host backend:!HOST_IP! ^
+        -p 8080:80 ^
+        suzhen-frontend:latest
+
     if errorlevel 1 (
-        docker-compose -f docker/docker-compose.yaml up -d --build frontend 2>nul
+        echo Frontend container failed to start
+        pause
+        exit /b 1
     )
 
     set FINISHED=1
